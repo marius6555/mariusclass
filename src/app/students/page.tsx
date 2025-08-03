@@ -24,7 +24,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Pencil } from "lucide-react";
+import { PlusCircle, Pencil, LogIn, LogOut } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 const studentSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -55,6 +58,7 @@ export default function StudentsPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,9 +70,14 @@ export default function StudentsPage() {
       } else {
         setStudents(initialStudents);
       }
+      const storedUser = localStorage.getItem("currentUser");
+      if(storedUser) {
+        setCurrentUser(storedUser);
+      }
     } catch (error) {
-      console.error("Failed to parse students from localStorage", error);
+      console.error("Failed to parse from localStorage", error);
       setStudents(initialStudents);
+      setCurrentUser(null);
     }
   }, []);
 
@@ -77,6 +86,17 @@ export default function StudentsPage() {
       localStorage.setItem("students", JSON.stringify(students));
     }
   }, [students, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      if(currentUser) {
+        localStorage.setItem("currentUser", currentUser);
+      } else {
+        localStorage.removeItem("currentUser");
+      }
+    }
+  }, [currentUser, isMounted]);
+
 
   const form = useForm<z.infer<typeof studentSchema>>({
     resolver: zodResolver(studentSchema),
@@ -119,6 +139,10 @@ export default function StudentsPage() {
       });
     } else {
       // Add new student
+       if (students.find(s => s.name.toLowerCase() === values.name.toLowerCase())) {
+        form.setError("name", { type: "manual", message: "A student with this name already exists." });
+        return;
+      }
       const initials = values.name.split(' ').map(n => n[0]).join('');
       const newStudent: Student = {
         ...values,
@@ -128,9 +152,10 @@ export default function StudentsPage() {
         hint: "person portrait",
       };
       setStudents(prev => [...prev, newStudent]);
+      setCurrentUser(newStudent.name); // Automatically log in the new user
       toast({
         title: "Profile Created!",
-        description: "Your student profile has been added.",
+        description: "Your student profile has been added and you are now logged in.",
         className: "bg-accent text-accent-foreground border-green-300",
       });
     }
@@ -144,6 +169,16 @@ export default function StudentsPage() {
     setEditingStudent(student);
     setOpen(true);
   }
+  
+  const handleLogin = (name: string) => {
+    if (name === 'logout') {
+        setCurrentUser(null);
+        toast({ title: "Logged Out", description: "You have been successfully logged out." });
+    } else {
+        setCurrentUser(name);
+        toast({ title: "Logged In!", description: `You are now logged in as ${name}.`});
+    }
+  };
 
   if (!isMounted) {
     return null; // or a loading spinner
@@ -156,71 +191,98 @@ export default function StudentsPage() {
         description="Get to know your fellow classmates and their interests."
       />
       <main className="p-6 lg:p-8">
-        <div className="flex justify-between items-center mb-6">
-          <div/>
-          <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setEditingStudent(null); }}>
-            <DialogTrigger asChild>
-              <Button onClick={() => handleOpenDialog(null)}>
-                <PlusCircle className="mr-2" />
-                Add Your Profile
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>{editingStudent ? "Edit Your Profile" : "Create Your Profile"}</DialogTitle>
-                <DialogDescription>
-                  {editingStudent ? "Update your details below." : "Add your details to be displayed on the student profiles page."} Click save when you're done.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Ada Lovelace" {...field} disabled={!!editingStudent}/>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="major"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Major</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Computer Science" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="interests"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Interests</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. AI, Web Dev, UX Design" {...field} />
-                        </FormControl>
-                         <p className="text-sm text-muted-foreground">Please separate interests with a comma.</p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button type="submit">Save changes</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+        <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
+          {currentUser ? (
+              <Alert className="max-w-md">
+                  <LogIn className="h-4 w-4" />
+                  <AlertTitle>You are logged in as {currentUser}</AlertTitle>
+                  <AlertDescription>
+                      You can now edit your profile. To switch profiles, please log out first.
+                  </AlertDescription>
+              </Alert>
+          ) : (
+            <Alert className="max-w-md">
+                  <AlertTitle>You are not logged in</AlertTitle>
+                  <AlertDescription>
+                     Select your profile from the dropdown to log in and manage your profile.
+                  </AlertDescription>
+              </Alert>
+          )}
+
+          <div className="flex gap-2 items-center">
+            <Select onValueChange={handleLogin} value={currentUser || ''}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select Profile..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {students.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}
+                    {currentUser && <SelectItem value="logout">Log Out</SelectItem>}
+                </SelectContent>
+            </Select>
+            <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setEditingStudent(null); }}>
+              <DialogTrigger asChild>
+                <Button onClick={() => handleOpenDialog(null)}>
+                  <PlusCircle className="mr-2" />
+                  Add Your Profile
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>{editingStudent ? "Edit Your Profile" : "Create Your Profile"}</DialogTitle>
+                  <DialogDescription>
+                    {editingStudent ? "Update your details below." : "Add your details to be displayed on the student profiles page."} Click save when you're done.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Ada Lovelace" {...field} disabled={!!editingStudent}/>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="major"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Major</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Computer Science" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="interests"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Interests</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. AI, Web Dev, UX Design" {...field} />
+                          </FormControl>
+                           <p className="text-sm text-muted-foreground">Please separate interests with a comma.</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit">Save changes</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {students.map((student) => (
@@ -242,7 +304,7 @@ export default function StudentsPage() {
                 </div>
               </CardContent>
               <CardFooter className="justify-center">
-                 <Button variant="outline" size="sm" onClick={() => handleOpenDialog(student)}>
+                 <Button variant="outline" size="sm" onClick={() => handleOpenDialog(student)} disabled={currentUser !== student.name}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit Profile
                   </Button>
