@@ -8,7 +8,7 @@ import * as z from "zod";
 
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Pencil } from "lucide-react";
 
 const studentSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -54,6 +54,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [open, setOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -86,23 +87,62 @@ export default function StudentsPage() {
     },
   });
 
+  useEffect(() => {
+    if (editingStudent) {
+      form.reset({
+        name: editingStudent.name,
+        major: editingStudent.major,
+        interests: editingStudent.interests.join(', '),
+      });
+    } else {
+      form.reset({
+        name: "",
+        major: "",
+        interests: "",
+      });
+    }
+  }, [editingStudent, form]);
+
   function onSubmit(values: z.infer<typeof studentSchema>) {
-    const initials = values.name.split(' ').map(n => n[0]).join('');
-    const newStudent: Student = {
-      ...values,
-      interests: values.interests.split(',').map(interest => interest.trim()),
-      avatar: `https://placehold.co/100x100.png`,
-      initials: initials.toUpperCase(),
-      hint: "person portrait",
-    };
-    setStudents(prev => [...prev, newStudent]);
-    toast({
-      title: "Profile Created!",
-      description: "Your student profile has been added.",
-      className: "bg-accent text-accent-foreground border-green-300",
-    });
+    const interestsArray = values.interests.split(',').map(interest => interest.trim());
+
+    if (editingStudent) {
+      // Update existing student
+      const updatedStudents = students.map(student =>
+        student.name === editingStudent.name ? { ...student, ...values, interests: interestsArray } : student
+      );
+      setStudents(updatedStudents);
+      toast({
+        title: "Profile Updated!",
+        description: "Your student profile has been successfully updated.",
+        className: "bg-accent text-accent-foreground border-green-300",
+      });
+    } else {
+      // Add new student
+      const initials = values.name.split(' ').map(n => n[0]).join('');
+      const newStudent: Student = {
+        ...values,
+        interests: interestsArray,
+        avatar: `https://placehold.co/100x100.png`,
+        initials: initials.toUpperCase(),
+        hint: "person portrait",
+      };
+      setStudents(prev => [...prev, newStudent]);
+      toast({
+        title: "Profile Created!",
+        description: "Your student profile has been added.",
+        className: "bg-accent text-accent-foreground border-green-300",
+      });
+    }
+
     form.reset();
+    setEditingStudent(null);
     setOpen(false);
+  }
+  
+  const handleOpenDialog = (student: Student | null) => {
+    setEditingStudent(student);
+    setOpen(true);
   }
 
   if (!isMounted) {
@@ -118,18 +158,18 @@ export default function StudentsPage() {
       <main className="p-6 lg:p-8">
         <div className="flex justify-between items-center mb-6">
           <div/>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setEditingStudent(null); }}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => handleOpenDialog(null)}>
                 <PlusCircle className="mr-2" />
                 Add Your Profile
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Create Your Profile</DialogTitle>
+                <DialogTitle>{editingStudent ? "Edit Your Profile" : "Create Your Profile"}</DialogTitle>
                 <DialogDescription>
-                  Add your details to be displayed on the student profiles page. Click save when you're done.
+                  {editingStudent ? "Update your details below." : "Add your details to be displayed on the student profiles page."} Click save when you're done.
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -141,7 +181,7 @@ export default function StudentsPage() {
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Ada Lovelace" {...field} />
+                          <Input placeholder="e.g. Ada Lovelace" {...field} disabled={!!editingStudent}/>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -184,7 +224,7 @@ export default function StudentsPage() {
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {students.map((student) => (
-            <Card key={student.name} className="text-center hover:shadow-lg transition-shadow">
+            <Card key={student.name} className="flex flex-col text-center hover:shadow-lg transition-shadow">
               <CardHeader className="items-center">
                 <Avatar className="w-24 h-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
                   <AvatarImage src={student.avatar} alt={student.name} data-ai-hint={student.hint} />
@@ -193,7 +233,7 @@ export default function StudentsPage() {
                 <CardTitle className="font-headline">{student.name}</CardTitle>
                 <p className="text-muted-foreground">{student.major}</p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-grow">
                 <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {student.interests.map((interest) => (
@@ -201,6 +241,12 @@ export default function StudentsPage() {
                   ))}
                 </div>
               </CardContent>
+              <CardFooter className="justify-center">
+                 <Button variant="outline" size="sm" onClick={() => handleOpenDialog(student)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Profile
+                  </Button>
+              </CardFooter>
             </Card>
           ))}
         </div>
