@@ -9,7 +9,7 @@ export function PageHeader({ title, description }: PageHeaderProps) {
   return (
     <header className="flex items-center gap-4 p-4 lg:p-6 border-b bg-card">
       <SidebarTrigger className="md:hidden" />
-      <div>
+      <div className="hidden">
         <h1 className="font-headline text-2xl font-bold tracking-tight">{title}</h1>
         <p className="text-muted-foreground">{description}</p>
       </div>

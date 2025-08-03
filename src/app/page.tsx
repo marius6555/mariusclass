@@ -48,6 +48,10 @@ export default function Home() {
         description="Your central hub for class activities, resources, and collaboration."
       />
       <main className="p-6 lg:p-8">
+        <div className="text-center mb-12">
+          <h1 className="font-headline text-5xl font-bold tracking-tight">Welcome to ClassHub Central</h1>
+          <p className="text-muted-foreground mt-4 text-lg">Your central hub for class activities, resources, and collaboration.</p>
+        </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {sections.map((section) => (
             <Card key={section.title} className="flex flex-col transition-transform transform hover:-translate-y-1">
