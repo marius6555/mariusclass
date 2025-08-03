@@ -5,6 +5,8 @@ import React, { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { collection, getDocs, addDoc, updateDoc, doc, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
@@ -24,10 +26,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Pencil, LogIn, LogOut } from "lucide-react";
+import { PlusCircle, Pencil, LogIn, LogOut, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
 
 const studentSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -36,6 +37,7 @@ const studentSchema = z.object({
 });
 
 type Student = {
+  id: string;
   name: string;
   major: string;
   interests: string[];
@@ -44,48 +46,93 @@ type Student = {
   hint: string;
 };
 
-const initialStudents: Student[] = [
-  { name: "Alice Johnson", major: "Computer Science", interests: ["AI", "Web Dev", "UX Design"], avatar: "https://placehold.co/100x100.png", initials: "AJ", hint: "woman face" },
-  { name: "Bob Williams", major: "Data Science", interests: ["Machine Learning", "Statistics"], avatar: "https://placehold.co/100x100.png", initials: "BW", hint: "man portrait" },
-  { name: "Charlie Brown", major: "Software Engineering", interests: ["Mobile Apps", "Game Dev"], avatar: "https://placehold.co/100x100.png", initials: "CB", hint: "person smiling" },
-  { name: "Diana Miller", major: "Cybersecurity", interests: ["Networking", "Ethical Hacking"], avatar: "https://placehold.co/100x100.png", initials: "DM", hint: "woman smiling" },
-  { name: "Ethan Davis", major: "Computer Science", interests: ["Cloud Computing", "DevOps"], avatar: "https://placehold.co/100x100.png", initials: "ED", hint: "man face" },
-  { name: "Fiona Garcia", major: "Information Systems", interests: ["Project Management", "UI/UX"], avatar: "https://placehold.co/100x100.png", initials: "FG", hint: "person portrait" },
+const defaultStudents: Omit<Student, 'id'>[] = [
+    { name: "Alice Johnson", major: "Computer Science", interests: ["AI", "Web Dev", "UX Design"], avatar: "https://placehold.co/100x100.png", initials: "AJ", hint: "woman face" },
+    { name: "Bob Williams", major: "Data Science", interests: ["Machine Learning", "Statistics"], avatar: "https://placehold.co/100x100.png", initials: "BW", hint: "man portrait" },
+    { name: "Charlie Brown", major: "Software Engineering", interests: ["Mobile Apps", "Game Dev"], avatar: "https://placehold.co/100x100.png", initials: "CB", hint: "person smiling" },
 ];
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    setIsMounted(true);
+  const fetchStudents = async () => {
+    setLoading(true);
     try {
-      const storedStudents = localStorage.getItem("students");
-      if (storedStudents) {
-        setStudents(JSON.parse(storedStudents));
+      const studentsCollection = collection(db, "students");
+      const studentSnapshot = await getDocs(studentsCollection);
+      if (studentSnapshot.empty) {
+        // Seed database with default students if collection is empty
+        for (const stud of defaultStudents) {
+          await addDoc(studentsCollection, {
+            name: stud.name,
+            major: stud.major,
+            interests: stud.interests,
+          });
+        }
+        // Fetch again after seeding
+        const newSnapshot = await getDocs(studentsCollection);
+        const studentsList = newSnapshot.docs.map(doc => {
+            const data = doc.data();
+            const name = data.name || '';
+            const initials = name.split(' ').map((n:string) => n[0]).join('');
+            return {
+                id: doc.id,
+                name,
+                major: data.major || '',
+                interests: data.interests || [],
+                avatar: `https://placehold.co/100x100.png`,
+                initials: initials.toUpperCase(),
+                hint: "person portrait",
+            } as Student;
+        });
+        setStudents(studentsList);
       } else {
-        setStudents(initialStudents);
+        const studentsList = studentSnapshot.docs.map(doc => {
+            const data = doc.data();
+            const name = data.name || '';
+            const initials = name.split(' ').map((n:string) => n[0]).join('');
+            return {
+                id: doc.id,
+                name,
+                major: data.major || '',
+                interests: data.interests || [],
+                avatar: `https://placehold.co/100x100.png`,
+                initials: initials.toUpperCase(),
+                hint: "person portrait",
+            } as Student;
+        });
+        setStudents(studentsList);
       }
+    } catch (error) {
+      console.error("Error fetching students: ", error);
+      toast({
+        title: "Error",
+        description: "Could not fetch student profiles.",
+        variant: "destructive",
+      });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchStudents();
+    setIsMounted(true);
+     try {
       const storedUser = localStorage.getItem("currentUser");
       if(storedUser) {
         setCurrentUser(storedUser);
       }
     } catch (error) {
       console.error("Failed to parse from localStorage", error);
-      setStudents(initialStudents);
       setCurrentUser(null);
     }
   }, []);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem("students", JSON.stringify(students));
-    }
-  }, [students, isMounted]);
 
   useEffect(() => {
     if (isMounted) {
@@ -96,7 +143,6 @@ export default function StudentsPage() {
       }
     }
   }, [currentUser, isMounted]);
-
 
   const form = useForm<z.infer<typeof studentSchema>>({
     resolver: zodResolver(studentSchema),
@@ -123,46 +169,47 @@ export default function StudentsPage() {
     }
   }, [editingStudent, form]);
 
-  function onSubmit(values: z.infer<typeof studentSchema>) {
+  async function onSubmit(values: z.infer<typeof studentSchema>) {
     const interestsArray = values.interests.split(',').map(interest => interest.trim());
+    const studentData = { ...values, interests: interestsArray };
 
-    if (editingStudent) {
-      // Update existing student
-      const updatedStudents = students.map(student =>
-        student.name === editingStudent.name ? { ...student, ...values, interests: interestsArray } : student
-      );
-      setStudents(updatedStudents);
-      toast({
-        title: "Profile Updated!",
-        description: "Your student profile has been successfully updated.",
-        className: "bg-accent text-accent-foreground border-green-300",
-      });
-    } else {
-      // Add new student
-       if (students.find(s => s.name.toLowerCase() === values.name.toLowerCase())) {
-        form.setError("name", { type: "manual", message: "A student with this name already exists." });
-        return;
-      }
-      const initials = values.name.split(' ').map(n => n[0]).join('');
-      const newStudent: Student = {
-        ...values,
-        interests: interestsArray,
-        avatar: `https://placehold.co/100x100.png`,
-        initials: initials.toUpperCase(),
-        hint: "person portrait",
-      };
-      setStudents(prev => [...prev, newStudent]);
-      setCurrentUser(newStudent.name); // Automatically log in the new user
-      toast({
-        title: "Profile Created!",
-        description: "Your student profile has been added and you are now logged in.",
-        className: "bg-accent text-accent-foreground border-green-300",
-      });
+    try {
+        if (editingStudent) {
+          const studentDoc = doc(db, "students", editingStudent.id);
+          await updateDoc(studentDoc, studentData);
+          toast({
+            title: "Profile Updated!",
+            description: "Your student profile has been successfully updated.",
+            className: "bg-accent text-accent-foreground border-green-300",
+          });
+        } else {
+          const q = query(collection(db, "students"), where("name", "==", values.name));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            form.setError("name", { type: "manual", message: "A student with this name already exists." });
+            return;
+          }
+
+          await addDoc(collection(db, "students"), studentData);
+          setCurrentUser(values.name);
+          toast({
+            title: "Profile Created!",
+            description: "Your student profile has been added and you are now logged in.",
+            className: "bg-accent text-accent-foreground border-green-300",
+          });
+        }
+        fetchStudents(); // Refresh data
+        form.reset();
+        setEditingStudent(null);
+        setOpen(false);
+    } catch (error) {
+        console.error("Error saving student data: ", error);
+        toast({
+            title: "Save Error",
+            description: "Could not save your profile. Please try again.",
+            variant: "destructive"
+        });
     }
-
-    form.reset();
-    setEditingStudent(null);
-    setOpen(false);
   }
   
   const handleOpenDialog = (student: Student | null) => {
@@ -215,7 +262,7 @@ export default function StudentsPage() {
                     <SelectValue placeholder="Select Profile..." />
                 </SelectTrigger>
                 <SelectContent>
-                    {students.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}
+                    {students.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                     {currentUser && <SelectItem value="logout">Log Out</SelectItem>}
                 </SelectContent>
             </Select>
@@ -284,34 +331,40 @@ export default function StudentsPage() {
             </Dialog>
           </div>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {students.map((student) => (
-            <Card key={student.name} className="flex flex-col text-center hover:shadow-lg transition-shadow">
-              <CardHeader className="items-center">
-                <Avatar className="w-24 h-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
-                  <AvatarImage src={student.avatar} alt={student.name} data-ai-hint={student.hint} />
-                  <AvatarFallback>{student.initials}</AvatarFallback>
-                </Avatar>
-                <CardTitle className="font-headline">{student.name}</CardTitle>
-                <p className="text-muted-foreground">{student.major}</p>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {student.interests.map((interest) => (
-                    <Badge key={interest} variant="secondary">{interest}</Badge>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter className="justify-center">
-                 <Button variant="outline" size="sm" onClick={() => handleOpenDialog(student)} disabled={currentUser !== student.name}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit Profile
-                  </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+        {loading ? (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {students.map((student) => (
+                <Card key={student.id} className="flex flex-col text-center hover:shadow-lg transition-shadow">
+                <CardHeader className="items-center">
+                    <Avatar className="w-24 h-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
+                    <AvatarImage src={student.avatar} alt={student.name} data-ai-hint={student.hint} />
+                    <AvatarFallback>{student.initials}</AvatarFallback>
+                    </Avatar>
+                    <CardTitle className="font-headline">{student.name}</CardTitle>
+                    <p className="text-muted-foreground">{student.major}</p>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                    <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                    {student.interests.map((interest) => (
+                        <Badge key={interest} variant="secondary">{interest}</Badge>
+                    ))}
+                    </div>
+                </CardContent>
+                <CardFooter className="justify-center">
+                    <Button variant="outline" size="sm" onClick={() => handleOpenDialog(student)} disabled={currentUser !== student.name}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit Profile
+                    </Button>
+                </CardFooter>
+                </Card>
+            ))}
+            </div>
+        )}
       </main>
     </SidebarInset>
   );
