@@ -190,7 +190,7 @@ export default function StudentsPage() {
             return;
           }
 
-          await addDoc(collection(db, "students"), studentData);
+          const docRef = await addDoc(collection(db, "students"), studentData);
           setCurrentUser(values.name);
           toast({
             title: "Profile Created!",
@@ -238,99 +238,97 @@ export default function StudentsPage() {
         description="Get to know your fellow classmates and their interests."
       />
       <main className="p-6 lg:p-8">
-        <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-          {currentUser ? (
-              <Alert className="max-w-md">
-                  <LogIn className="h-4 w-4" />
-                  <AlertTitle>You are logged in as {currentUser}</AlertTitle>
-                  <AlertDescription>
-                      You can now edit your profile. To switch profiles, please log out first.
-                  </AlertDescription>
-              </Alert>
-          ) : (
-            <Alert className="max-w-md">
-                  <AlertTitle>You are not logged in</AlertTitle>
-                  <AlertDescription>
-                     Select your profile from the dropdown to log in and manage your profile.
-                  </AlertDescription>
-              </Alert>
-          )}
+        <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setEditingStudent(null); }}>
+            <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
+            {currentUser ? (
+                <Alert className="max-w-md">
+                    <LogIn className="h-4 w-4" />
+                    <AlertTitle>You are logged in as {currentUser}</AlertTitle>
+                    <AlertDescription>
+                        You can now edit your profile. To switch profiles, please log out first.
+                    </AlertDescription>
+                </Alert>
+            ) : (
+                <Alert className="max-w-md">
+                    <AlertTitle>You are not logged in</AlertTitle>
+                    <AlertDescription>
+                        Select your profile from the dropdown to log in and manage your profile.
+                    </AlertDescription>
+                </Alert>
+            )}
 
-          <div className="flex gap-2 items-center">
-            <Select onValueChange={handleLogin} value={currentUser || ''}>
-                <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select Profile..." />
-                </SelectTrigger>
-                <SelectContent>
-                    {students.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                    {currentUser && <SelectItem value="logout">Log Out</SelectItem>}
-                </SelectContent>
-            </Select>
-            <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setEditingStudent(null); }}>
-              <DialogTrigger asChild>
+            <div className="flex gap-2 items-center">
+                <Select onValueChange={handleLogin} value={currentUser || ''}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select Profile..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {students.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                        {currentUser && <SelectItem value="logout">Log Out</SelectItem>}
+                    </SelectContent>
+                </Select>
                 <Button onClick={() => handleOpenDialog(null)}>
-                  <PlusCircle className="mr-2" />
-                  Add Your Profile
+                    <PlusCircle className="mr-2" />
+                    Add Your Profile
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>{editingStudent ? "Edit Your Profile" : "Create Your Profile"}</DialogTitle>
-                  <DialogDescription>
-                    {editingStudent ? "Update your details below." : "Add your details to be displayed on the student profiles page."} Click save when you're done.
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. Ada Lovelace" {...field} disabled={!!editingStudent}/>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="major"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Major</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. Computer Science" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="interests"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Interests</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. AI, Web Dev, UX Design" {...field} />
-                          </FormControl>
-                           <p className="text-sm text-muted-foreground">Please separate interests with a comma.</p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <DialogFooter>
-                      <Button type="submit">Save changes</Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
+            </div>
+            </div>
+            <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle>{editingStudent ? "Edit Your Profile" : "Create Your Profile"}</DialogTitle>
+                <DialogDescription>
+                {editingStudent ? "Update your details below." : "Add your details to be displayed on the student profiles page."} Click save when you're done.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+                <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                        <Input placeholder="e.g. Ada Lovelace" {...field} disabled={!!editingStudent}/>
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="major"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Major</FormLabel>
+                        <FormControl>
+                        <Input placeholder="e.g. Computer Science" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="interests"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Interests</FormLabel>
+                        <FormControl>
+                        <Input placeholder="e.g. AI, Web Dev, UX Design" {...field} />
+                        </FormControl>
+                        <p className="text-sm text-muted-foreground">Please separate interests with a comma.</p>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <DialogFooter>
+                    <Button type="submit">Save changes</Button>
+                </DialogFooter>
+                </form>
+            </Form>
+            </DialogContent>
+        </Dialog>
         {loading ? (
             <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin" />
