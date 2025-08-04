@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, PlusCircle } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, doc, query, where } from "firebase/firestore";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Check, ChevronsUpDown } from "lucide-react"
-import { cn } from "@/lib/utils";
+import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -38,15 +35,16 @@ export type Student = {
   avatar: string;
   initials: string;
   hint: string;
+  email?: string;
 };
 
 const defaultStudents: Omit<Student, 'id' | 'initials' | 'hint'>[] = [
-    { name: "Alice Johnson", major: "Computer Science", interests: ["AI", "Web Dev", "UX Design"], avatar: "https://placehold.co/100x100.png" },
-    { name: "Bob Williams", major: "Data Science", interests: ["Machine Learning", "Statistics"], avatar: "https://placehold.co/100x100.png" },
-    { name: "Charlie Brown", major: "Software Engineering", interests: ["Mobile Apps", "Game Dev"], avatar: "https://placehold.co/100x100.png" },
+    { name: "Alice Johnson", major: "Computer Science", interests: ["AI", "Web Dev", "UX Design"], avatar: "https://placehold.co/100x100.png", email: "alice@example.com" },
+    { name: "Bob Williams", major: "Data Science", interests: ["Machine Learning", "Statistics"], avatar: "https://placehold.co/100x100.png", email: "bob@example.com" },
+    { name: "Charlie Brown", major: "Software Engineering", interests: ["Mobile Apps", "Game Dev"], avatar: "https://placehold.co/100x100.png", email: "charlie@example.com" },
 ];
 
-function StudentForm({ student, onSave, onOpenChange }: { student?: Student | null, onSave: () => void, onOpenChange: (open:boolean) => void }) {
+function StudentForm({ student, onSave, onOpenChange }: { student?: Student | null, onSave: (updatedStudent: Partial<Student>) => void, onOpenChange: (open:boolean) => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -58,27 +56,20 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
   });
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!student) return;
     try {
       const studentData = {
         name: values.name,
         major: values.major,
         interests: values.interests.split(",").map(i => i.trim()),
         avatar: values.avatar || `https://placehold.co/100x100.png`,
-        initials: values.name.split(" ").map(n => n[0]).join(""),
-        hint: 'person',
       };
 
-      if (student) {
-        // Update existing student
-        const studentDocRef = doc(db, "students", student.id);
-        await updateDoc(studentDocRef, studentData);
-      } else {
-        // Add new student
-        await addDoc(collection(db, "students"), studentData);
-      }
-      onSave();
+      const studentDocRef = doc(db, "students", student.id);
+      await updateDoc(studentDocRef, studentData);
+      
+      onSave({...student, ...studentData});
       onOpenChange(false);
-      form.reset();
     } catch (error) {
       console.error("Error saving student: ", error);
     }
@@ -90,7 +81,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
         <FormField control={form.control} name="name" render={({ field }) => (
           <FormItem>
             <FormLabel>Full Name</FormLabel>
-            <FormControl><Input placeholder="Alice Johnson" {...field} disabled={!!student} /></FormControl>
+            <FormControl><Input placeholder="Alice Johnson" {...field} disabled /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -127,23 +118,13 @@ export default function StudentsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
-  const [popoverOpen, setPopoverOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchStudents = async () => {
     try {
         const querySnapshot = await getDocs(collection(db, "students"));
         if (querySnapshot.empty) {
-            // If no students in firestore, add the default ones
-            for (const stud of defaultStudents) {
-                const studentData = {
-                    ...stud,
-                    initials: stud.name.split(" ").map(n => n[0]).join(""),
-                    hint: 'person',
-                };
-                await addDoc(collection(db, "students"), studentData);
-            }
-            fetchStudents(); // re-fetch to display
+            // Firestore is empty, no need to add defaults anymore
         } else {
             const studentsList = querySnapshot.docs.map(doc => ({
                 id: doc.id,
@@ -170,12 +151,6 @@ export default function StudentsPage() {
     }
   }, []);
 
-  const handleLogin = (student: Student) => {
-    setCurrentUser(student);
-    localStorage.setItem("currentUser", JSON.stringify(student));
-    setPopoverOpen(false);
-  }
-
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem("currentUser");
@@ -185,13 +160,12 @@ export default function StudentsPage() {
     setEditingStudent(student);
     setIsDialogOpen(true);
   }
-
-  const handleAdd = () => {
-    setEditingStudent(null);
-    setIsDialogOpen(true);
-  }
   
-  const onSave = () => {
+  const onSave = (updatedStudent: Partial<Student>) => {
+    const updatedUser = { ...currentUser, ...updatedStudent } as Student;
+    setCurrentUser(updatedUser);
+    localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+    
     fetchStudents();
     setIsDialogOpen(false);
     setEditingStudent(null);
@@ -199,17 +173,6 @@ export default function StudentsPage() {
         title: "Profile Saved!",
         description: "Your profile has been successfully saved.",
     });
-    // If the current user was the one being edited, update their info in localStorage
-    if (currentUser && editingStudent && currentUser.id === editingStudent.id) {
-        fetchStudents().then(() => {
-            // we need to get the updated student from the new list
-            const updatedUser = students.find(s => s.id === currentUser.id);
-            if (updatedUser) {
-                setCurrentUser(updatedUser);
-                localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-            }
-        });
-    }
   }
 
   return (
@@ -222,56 +185,23 @@ export default function StudentsPage() {
         <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">
               {currentUser ? (
-                  <>
+                  <div className="flex items-center gap-4">
                       <p>Welcome, <span className="font-bold">{currentUser.name}</span>!</p>
                       <Button variant="outline" size="sm" onClick={handleLogout}>Log Out</Button>
-                  </>
+                  </div>
               ) : (
-                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={popoverOpen}
-                      className="w-[200px] justify-between"
-                    >
-                      Select profile to login...
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0">
-                    <Command>
-                      <CommandInput placeholder="Search student..." />
-                      <CommandEmpty>No student found.</CommandEmpty>
-                      <CommandGroup>
-                        {students.map((student) => (
-                          <CommandItem
-                            key={student.id}
-                            value={student.name}
-                            onSelect={() => handleLogin(student)}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                currentUser?.id === student.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {student.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <div className="flex items-center gap-2">
+                    <p>Please sign up or log in to manage your profile.</p>
+                    <Link href="/auth">
+                        <Button>Sign Up / Login</Button>
+                    </Link>
+                </div>
               )}
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={handleAdd}><PlusCircle className="mr-2"/> Add Your Profile</Button>
-              </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingStudent ? "Edit Your Profile" : "Add Your Profile"}</DialogTitle>
+                  <DialogTitle>Edit Your Profile</DialogTitle>
                 </DialogHeader>
                 <StudentForm student={editingStudent} onSave={onSave} onOpenChange={setIsDialogOpen} />
               </DialogContent>
@@ -282,8 +212,8 @@ export default function StudentsPage() {
             <Card key={student.id} className="flex flex-col text-center hover:shadow-lg transition-shadow">
             <CardHeader className="items-center">
                 <Avatar className="w-24 h-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
-                <AvatarImage src={student.avatar} alt={student.name} data-ai-hint={student.hint} />
-                <AvatarFallback>{student.initials}</AvatarFallback>
+                <AvatarImage src={student.avatar} alt={student.name} data-ai-hint={student.hint || 'person'} />
+                <AvatarFallback>{student.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
                 </Avatar>
                 <CardTitle className="font-headline">{student.name}</CardTitle>
                 <p className="text-muted-foreground">{student.major}</p>

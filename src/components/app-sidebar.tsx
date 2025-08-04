@@ -1,3 +1,4 @@
+
 'use client'
 
 import {
@@ -17,6 +18,7 @@ import {
   BookCopy,
   Mail,
   GraduationCap,
+  LogIn,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -28,6 +30,7 @@ const links = [
   { href: "/events", label: "Events/Updates", icon: CalendarClock },
   { href: "/resources", label: "Resources", icon: BookCopy },
   { href: "/contact", label: "Contact/Join Us", icon: Mail },
+  { href: "/auth", label: "Login/Sign Up", icon: LogIn },
 ]
 
 export function AppSidebar() {

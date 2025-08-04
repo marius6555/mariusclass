@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect } from 'react';
@@ -118,10 +119,7 @@ export default function ProjectsPage() {
     try {
       const querySnapshot = await getDocs(collection(db, "projects"));
       if (querySnapshot.empty) {
-        for (const proj of defaultProjects) {
-          await addDoc(collection(db, "projects"), proj);
-        }
-        fetchProjects();
+        // Leave empty if no projects
       } else {
         const projectsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         setProjects(projectsList);
@@ -170,7 +168,12 @@ export default function ProjectsPage() {
                 {currentUser ? (
                     <ProjectForm onSave={onSave} onOpenChange={setIsDialogOpen} author={currentUser.name} />
                 ) : (
-                    <p className="text-center text-muted-foreground">Please log in on the Student Profiles page to add a project.</p>
+                    <div className="text-center text-muted-foreground py-4">
+                        <p>Please log in to add a project.</p>
+                        <Link href="/auth" className="mt-2 inline-block">
+                            <Button>Login</Button>
+                        </Link>
+                    </div>
                 )}
               </DialogContent>
             </Dialog>
