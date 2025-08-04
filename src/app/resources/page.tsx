@@ -19,7 +19,7 @@ import * as z from "zod";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import type { Student } from '../students/page';
+import type { Student } from '@/types';
 
 const formSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),

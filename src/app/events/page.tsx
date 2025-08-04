@@ -18,7 +18,7 @@ import * as z from "zod";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import type { Student } from '../students/page';
+import type { Student } from '@/types';
 import Link from 'next/link';
 
 const formSchema = z.object({

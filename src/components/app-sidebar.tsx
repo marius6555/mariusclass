@@ -12,13 +12,13 @@ import {
 } from "@/components/ui/sidebar"
 import {
   Home,
-  Users,
   FolderKanban,
   CalendarClock,
   BookCopy,
   Mail,
   GraduationCap,
   LogIn,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"

@@ -68,7 +68,7 @@ export default function AuthPage() {
       localStorage.setItem("currentUser", JSON.stringify(currentUser));
 
       toast({ title: "Account Created!", description: "You have been successfully signed up." });
-      router.push('/students');
+      router.push('/');
 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Sign Up Failed", description: error.message });
@@ -92,7 +92,7 @@ export default function AuthPage() {
       localStorage.setItem("currentUser", JSON.stringify(currentUser));
       
       toast({ title: "Login Successful!", description: "Welcome back!" });
-      router.push('/students');
+      router.push('/');
 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Login Failed", description: error.message });
