@@ -34,7 +34,7 @@ const formSchema = z.object({
   avatar: z.any().optional(),
 });
 
-function StudentForm({ student, onSave, onOpenChange }: { student: Student | null, onSave: (data: any, isNew: boolean) => void, onOpenChange: (open: boolean) => void }) {
+function StudentForm({ student, onSave, onOpenChange }: { student: Student | null, onSave: (data: any) => void, onOpenChange: (open: boolean) => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -61,7 +61,6 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
   };
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    const isNew = !student?.id;
     const studentData = {
       ...values,
       interests: values.interests.split(",").map(i => i.trim()),
@@ -70,7 +69,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
     if (preview) {
       studentData.avatar = preview;
     }
-    onSave(studentData, isNew);
+    onSave(studentData);
     onOpenChange(false);
   };
 
@@ -138,9 +137,10 @@ export default function StudentsPage() {
     }
   }, []);
 
-  const onSave = async (data: any, isNew: boolean) => {
+  const onSave = async (data: any) => {
     if (!currentUser?.uid) return;
-  
+    
+    const isNew = !editingStudent;
     let avatarUrl = editingStudent?.avatar || `https://placehold.co/100x100.png`;
     
     if (data.avatar && data.avatar.startsWith('data:image')) {
@@ -207,16 +207,17 @@ export default function StudentsPage() {
       const credential = EmailAuthProvider.credential(auth.currentUser.email!, password);
       await reauthenticateWithCredential(auth.currentUser, credential);
 
-      // Delete avatar from Storage
       if (currentUser.avatar && currentUser.avatar.includes('firebasestorage')) {
         const avatarRef = ref(storage, currentUser.avatar);
-        await deleteObject(avatarRef);
+        await deleteObject(avatarRef).catch(error => {
+            if (error.code !== 'storage/object-not-found') {
+                throw error;
+            }
+            console.log("Avatar not found, skipping delete.");
+        });
       }
 
-      // Delete profile from Firestore
       await deleteDoc(doc(db, "students", currentUser.id));
-
-      // Delete user from Auth
       await deleteUser(auth.currentUser);
 
       localStorage.removeItem("currentUser");
