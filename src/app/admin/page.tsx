@@ -10,8 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, Timestamp, doc, updateDoc } from "firebase/firestore";
 import type { Student } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Mail } from 'lucide-react';
+import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 type Message = {
     id: string;
@@ -26,9 +30,21 @@ const ADMIN_EMAIL = "tingiya730@gmail.com";
 
 export default function AdminPage() {
     const router = useRouter();
+    const { toast } = useToast();
     const [messages, setMessages] = useState<Message[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const fetchMessages = async () => {
+        const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+        const messagesSnapshot = await getDocs(messagesQuery);
+        const messagesList = messagesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt
+        } as Message));
+        setMessages(messagesList);
+    };
 
     useEffect(() => {
         try {
@@ -48,15 +64,7 @@ export default function AdminPage() {
 
         const fetchData = async () => {
             try {
-                // Fetch Messages
-                const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
-                const messagesSnapshot = await getDocs(messagesQuery);
-                const messagesList = messagesSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                    createdAt: doc.data().createdAt
-                } as Message));
-                setMessages(messagesList);
+                await fetchMessages();
 
                 // Fetch Students
                 const studentsQuery = query(collection(db, "students"), orderBy("name"));
@@ -73,6 +81,25 @@ export default function AdminPage() {
 
         fetchData();
     }, [router]);
+
+    const handleToggleRead = async (message: Message) => {
+        try {
+            const messageRef = doc(db, "messages", message.id);
+            await updateDoc(messageRef, { read: !message.read });
+            await fetchMessages(); // Re-fetch to update UI
+            toast({
+                title: "Status Updated",
+                description: `Message marked as ${!message.read ? "read" : "unread"}.`
+            });
+        } catch (error) {
+            console.error("Error updating message status:", error);
+            toast({
+                variant: "destructive",
+                title: "Update Failed",
+                description: "Could not update the message status.",
+            });
+        }
+    };
 
     if (loading) {
         return (
@@ -104,6 +131,7 @@ export default function AdminPage() {
                                     <TableHead>Message</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -113,10 +141,26 @@ export default function AdminPage() {
                                         <TableCell>{msg.email}</TableCell>
                                         <TableCell className="max-w-xs truncate">{msg.message}</TableCell>
                                         <TableCell>{msg.createdAt.toDate().toLocaleDateString()}</TableCell>
-                                        <TableCell><Badge variant={msg.read ? "secondary" : "default"}>{msg.read ? "Read" : "Unread"}</Badge></TableCell>
+                                        <TableCell>
+                                            <Badge 
+                                                variant={msg.read ? "secondary" : "default"} 
+                                                onClick={() => handleToggleRead(msg)}
+                                                className="cursor-pointer"
+                                            >
+                                                {msg.read ? "Read" : "Unread"}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Link href={`mailto:${msg.email}?subject=Re: Your message to ClassHub Central`} passHref>
+                                                <Button variant="outline" size="icon">
+                                                    <Mail className="h-4 w-4" />
+                                                    <span className="sr-only">Reply</span>
+                                                </Button>
+                                            </Link>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
-                                {messages.length === 0 && <TableRow><TableCell colSpan={5} className="text-center">No messages yet.</TableCell></TableRow>}
+                                {messages.length === 0 && <TableRow><TableCell colSpan={6} className="text-center">No messages yet.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </CardContent>
