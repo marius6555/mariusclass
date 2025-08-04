@@ -1,7 +1,7 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
@@ -9,13 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, Timestamp, doc, updateDoc } from "firebase/firestore";
+import { db, storage } from "@/lib/firebase";
+import { collection, getDocs, query, orderBy, Timestamp, doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import type { Student } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Mail } from 'lucide-react';
+import { Mail, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import Image from 'next/image';
 
 type Message = {
     id: string;
@@ -35,8 +38,14 @@ export default function AdminPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
+    const [backgroundUrl, setBackgroundUrl] = useState<string>('https://placehold.co/1200x800.png');
+    const [newBgFile, setNewBgFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const fetchMessages = async () => {
+
+    const fetchAdminData = async () => {
+        // Fetch Messages
         const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
         const messagesSnapshot = await getDocs(messagesQuery);
         const messagesList = messagesSnapshot.docs.map(doc => ({
@@ -45,8 +54,20 @@ export default function AdminPage() {
             createdAt: doc.data().createdAt
         } as Message));
         setMessages(messagesList);
-    };
 
+        // Fetch Students
+        const studentsQuery = query(collection(db, "students"), orderBy("name"));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+        setStudents(studentsList);
+        
+        // Fetch Background URL
+        const settingsDoc = await getDoc(doc(db, "settings", "homePage"));
+        if (settingsDoc.exists() && settingsDoc.data().backgroundUrl) {
+            setBackgroundUrl(settingsDoc.data().backgroundUrl);
+        }
+    };
+    
     useEffect(() => {
         try {
             const storedUser = localStorage.getItem("currentUser");
@@ -63,31 +84,14 @@ export default function AdminPage() {
             router.push('/auth');
         }
 
-        const fetchData = async () => {
-            try {
-                await fetchMessages();
-
-                // Fetch Students
-                const studentsQuery = query(collection(db, "students"), orderBy("name"));
-                const studentsSnapshot = await getDocs(studentsQuery);
-                const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
-                setStudents(studentsList);
-
-            } catch (e) {
-                console.error("Error fetching admin data: ", e);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+        fetchAdminData().finally(() => setLoading(false));
     }, [router]);
 
     const handleToggleRead = async (message: Message) => {
         try {
             const messageRef = doc(db, "messages", message.id);
             await updateDoc(messageRef, { read: !message.read });
-            await fetchMessages(); // Re-fetch to update UI
+            await fetchAdminData(); // Re-fetch to update UI
             toast({
                 title: "Status Updated",
                 description: `Message marked as ${!message.read ? "read" : "unread"}.`
@@ -101,6 +105,64 @@ export default function AdminPage() {
             });
         }
     };
+    
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setNewBgFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setBackgroundUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleBackgroundUpload = async () => {
+        if (!newBgFile) {
+            toast({
+                variant: "destructive",
+                title: "No File Selected",
+                description: "Please select an image file to upload.",
+            });
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const storageRef = ref(storage, 'backgrounds/home-background');
+            
+            const reader = new FileReader();
+            reader.readAsDataURL(newBgFile);
+            reader.onload = async (event) => {
+                const dataUrl = event.target?.result as string;
+                await uploadString(storageRef, dataUrl, 'data_url');
+                const downloadUrl = await getDownloadURL(storageRef);
+
+                await setDoc(doc(db, "settings", "homePage"), {
+                    backgroundUrl: downloadUrl,
+                });
+
+                setBackgroundUrl(downloadUrl);
+                setNewBgFile(null);
+                toast({
+                    title: "Upload Successful",
+                    description: "Home page background has been updated.",
+                });
+            };
+
+        } catch (error) {
+            console.error("Error uploading background:", error);
+            toast({
+                variant: "destructive",
+                title: "Upload Failed",
+                description: "Could not upload the new background image.",
+            });
+        } finally {
+            setUploading(false);
+        }
+    };
+
 
     if (loading) {
         return (
@@ -118,6 +180,47 @@ export default function AdminPage() {
                 description="View messages and manage student profiles."
             />
             <main className="p-6 lg:p-8 space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Home Page Settings</CardTitle>
+                        <CardDescription>Customize the appearance of the home page.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <h4 className="font-semibold mb-2">Current Background Image</h4>
+                            <Image
+                                src={backgroundUrl}
+                                alt="Home page background"
+                                width={400}
+                                height={250}
+                                className="object-cover rounded-md border"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                             <input
+                                type="file"
+                                accept="image/*"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
+                            <Button onClick={() => fileInputRef.current?.click()}>
+                                Choose New Image
+                            </Button>
+                            {newBgFile && (
+                                <div className="flex items-center gap-4">
+                                     <p className="text-sm text-muted-foreground">
+                                        New file: {newBgFile.name}
+                                    </p>
+                                    <Button onClick={handleBackgroundUpload} disabled={uploading}>
+                                        <Upload className="mr-2 h-4 w-4" />
+                                        {uploading ? 'Uploading...' : 'Upload & Save'}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>Recent Messages</CardTitle>
@@ -218,3 +321,5 @@ export default function AdminPage() {
         </SidebarInset>
     );
 }
+
+    

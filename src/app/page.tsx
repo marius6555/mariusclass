@@ -1,13 +1,36 @@
 
 'use client'
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
 import Image from "next/image";
 import { GraduationCap } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function Home() {
+  const [backgroundUrl, setBackgroundUrl] = useState('https://placehold.co/1200x800.png');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBackground = async () => {
+      try {
+        const settingsDoc = await getDoc(doc(db, "settings", "homePage"));
+        if (settingsDoc.exists() && settingsDoc.data().backgroundUrl) {
+          setBackgroundUrl(settingsDoc.data().backgroundUrl);
+        }
+      } catch (error) {
+        console.error("Error fetching background image:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBackground();
+  }, []);
+
+
   return (
     <SidebarInset>
       <PageHeader
@@ -17,13 +40,16 @@ export default function Home() {
       <main className="flex-1">
         <div className="relative flex flex-col justify-center items-center text-center p-8 min-h-[calc(100vh-4.5rem)]">
             <div className="absolute inset-0 z-0">
-                <Image 
-                    src="https://placehold.co/1200x800.png" 
-                    alt="Classroom background"
-                    fill
-                    className="object-cover"
-                    data-ai-hint="classroom abstract"
-                />
+                {!loading && (
+                    <Image 
+                        src={backgroundUrl} 
+                        alt="Classroom background"
+                        fill
+                        className="object-cover"
+                        data-ai-hint="classroom abstract"
+                        priority
+                    />
+                )}
                 <div className="absolute inset-0 bg-background/80" />
             </div>
             <div className="relative z-10">
@@ -39,3 +65,5 @@ export default function Home() {
     </SidebarInset>
   );
 }
+
+    
