@@ -1,7 +1,7 @@
 
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storag
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Briefcase, PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Mail, Briefcase, PlusCircle, Trash2, Edit, Camera } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -47,6 +47,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
     },
   });
   const [preview, setPreview] = useState<string | null>(student?.avatar || null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -66,8 +67,10 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
       interests: values.interests.split(",").map(i => i.trim()),
       hobbies: values.hobbies?.split(",").map(i => i.trim()) || [],
     };
-    if (preview) {
+    if (preview && preview !== student?.avatar) {
       studentData.avatar = preview;
+    } else {
+      delete studentData.avatar;
     }
     onSave(studentData);
     onOpenChange(false);
@@ -76,6 +79,23 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormItem className="flex flex-col items-center">
+            <FormLabel htmlFor="avatar-upload" className="cursor-pointer">
+              <div className="relative group">
+                <Avatar className="w-24 h-24">
+                  <AvatarImage src={preview || `https://placehold.co/100x100.png`} alt={form.getValues("name")} />
+                  <AvatarFallback>{form.getValues("name")?.substring(0,2)}</AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="text-white h-8 w-8" />
+                </div>
+              </div>
+            </FormLabel>
+            <FormControl>
+              <Input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} ref={avatarInputRef} />
+            </FormControl>
+            <FormMessage />
+        </FormItem>
         <FormField control={form.control} name="name" render={({ field }) => (
           <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Ada Lovelace" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
@@ -91,13 +111,6 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
         <FormField control={form.control} name="hobbies" render={({ field }) => (
           <FormItem><FormLabel>Hobbies (comma-separated)</FormLabel><FormControl><Input placeholder="Reading, Hiking" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
-        <FormItem>
-          <FormLabel>Avatar</FormLabel>
-          <FormControl>
-            <Input type="file" accept="image/*" onChange={handleAvatarChange} />
-          </FormControl>
-          {preview && <Avatar className="w-24 h-24 mt-2"><AvatarImage src={preview} alt="Avatar preview" /><AvatarFallback>{form.getValues("name").substring(0,2)}</AvatarFallback></Avatar>}
-        </FormItem>
         <Button type="submit" className="w-full">Save Profile</Button>
       </form>
     </Form>
@@ -140,9 +153,11 @@ export default function StudentsPage() {
   const onSave = async (data: any) => {
     if (!currentUser?.uid) return;
     
-    const isNew = !editingStudent;
-    let avatarUrl = editingStudent?.avatar || `https://placehold.co/100x100.png`;
-    
+    let studentToUpdate = students.find(s => s.uid === currentUser.uid);
+    const isNew = !studentToUpdate;
+
+    let avatarUrl = studentToUpdate?.avatar;
+
     if (data.avatar && data.avatar.startsWith('data:image')) {
       const storageRef = ref(storage, `avatars/${currentUser.uid}`);
       await uploadString(storageRef, data.avatar, 'data_url');
@@ -150,40 +165,34 @@ export default function StudentsPage() {
     }
   
     const studentData = {
+      ...data,
       uid: currentUser.uid,
       email: currentUser.email,
-      name: data.name,
-      major: data.major,
-      interests: data.interests,
-      bio: data.bio || "",
-      hobbies: data.hobbies || [],
       avatar: avatarUrl,
       initials: data.name.split(" ").map((n:string) => n[0]).join(""),
       hint: 'person',
     };
+    delete studentData.id;
   
     try {
+      let updatedStudent: Student;
       if (isNew) {
-        const q = query(collection(db, "students"), where("uid", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            toast({ variant: "destructive", title: "Profile Exists", description: "A profile for this user already exists." });
-            return;
-        }
         const docRef = await addDoc(collection(db, "students"), studentData);
-        const newStudent = { id: docRef.id, ...studentData };
-        setCurrentUser(newStudent);
-        localStorage.setItem("currentUser", JSON.stringify(newStudent));
+        updatedStudent = { id: docRef.id, ...studentData };
         toast({ title: "Profile Created!", description: "Your student profile is now live." });
-      } else if (editingStudent?.id) {
-        const studentRef = doc(db, "students", editingStudent.id);
+      } else if(studentToUpdate?.id) {
+        const studentRef = doc(db, "students", studentToUpdate.id);
         await updateDoc(studentRef, studentData);
-        const updatedStudent = { ...currentUser, ...studentData, id: editingStudent.id };
-        setCurrentUser(updatedStudent);
-        localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
+        updatedStudent = { ...studentToUpdate, ...studentData };
         toast({ title: "Profile Updated!", description: "Your changes have been saved." });
+      } else {
+        throw new Error("Could not find student profile to update.");
       }
-      fetchStudents();
+
+      setCurrentUser(updatedStudent);
+      localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
+      
+      await fetchStudents(); // Refetch all students to update the list
       setIsFormOpen(false);
       setEditingStudent(null);
     } catch (error: any) {
@@ -344,3 +353,5 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
+
+    
