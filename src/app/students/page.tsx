@@ -301,7 +301,7 @@ export default function StudentsPage() {
                 )}
             </CardContent>
             <CardFooter className="justify-center gap-2">
-                 <Button variant="outline" size="sm" onClick={() => handleEdit(student)} disabled={!currentUser || currentUser.uid !== student.uid}>
+                <Button variant="outline" size="sm" onClick={() => handleEdit(student)} disabled={!currentUser || currentUser.uid !== student.uid}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit
                 </Button>
@@ -336,4 +336,3 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
-
