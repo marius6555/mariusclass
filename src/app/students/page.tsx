@@ -66,8 +66,10 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
       ...values,
       interests: values.interests.split(",").map(i => i.trim()),
       hobbies: values.hobbies?.split(",").map(i => i.trim()) || [],
-      avatar: values.avatar,
     };
+    if (preview) {
+      studentData.avatar = preview;
+    }
     onSave(studentData, isNew);
     onOpenChange(false);
   };
@@ -141,14 +143,13 @@ export default function StudentsPage() {
   
     let avatarUrl = editingStudent?.avatar || `https://placehold.co/100x100.png`;
     
-    // If a new avatar file data is present, upload it.
-    if (data.avatar) {
+    if (data.avatar && data.avatar.startsWith('data:image')) {
       const storageRef = ref(storage, `avatars/${currentUser.uid}`);
       await uploadString(storageRef, data.avatar, 'data_url');
       avatarUrl = await getDownloadURL(storageRef);
     }
   
-    const studentData: Omit<Student, 'id' | 'uid' | 'email'> & { uid: string; email: string; } = {
+    const studentData = {
       uid: currentUser.uid,
       email: currentUser.email,
       name: data.name,
@@ -342,5 +343,3 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
-
-    
