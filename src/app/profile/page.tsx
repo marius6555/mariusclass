@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { db, storage, auth } from "@/lib/firebase";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { db, storage } from "@/lib/firebase";
+import { updateDoc, doc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
-import Link from 'next/link';
+import type { Student } from '../students/page';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -30,20 +32,6 @@ const formSchema = z.object({
   bio: z.string().max(200, "Bio must be 200 characters or less.").optional(),
   hobbies: z.string().optional(),
 });
-
-export type Student = {
-  id: string;
-  name: string;
-  major: string;
-  interests: string[];
-  avatar: string;
-  initials: string;
-  hint: string;
-  email?: string;
-  uid?: string;
-  bio?: string;
-  hobbies?: string[];
-};
 
 function StudentForm({ student, onSave, onOpenChange }: { student?: Student | null, onSave: (updatedStudent: Partial<Student>) => void, onOpenChange: (open:boolean) => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -143,139 +131,126 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
   );
 }
 
-
-export default function StudentsPage() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
-
-  const fetchStudents = async () => {
-    try {
-        const querySnapshot = await getDocs(collection(db, "students"));
-        if (querySnapshot.empty) {
-            // Firestore is empty, no need to add defaults anymore
-        } else {
-            const studentsList = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            } as Student));
-            setStudents(studentsList);
-        }
-    } catch(e) {
-        console.error("Error fetching students, maybe firebase config is not set?", e);
-    }
-  };
+  const router = useRouter();
 
   useEffect(() => {
-    fetchStudents();
-
     try {
       const storedUser = localStorage.getItem("currentUser");
       if (storedUser) {
         setCurrentUser(JSON.parse(storedUser));
+      } else {
+        router.push('/auth');
       }
     } catch (error) {
       console.error("Failed to parse from localStorage", error);
       setCurrentUser(null);
+      router.push('/auth');
     }
-  }, []);
-
-  const handleEdit = (student: Student) => {
-    setEditingStudent(student);
-    setIsDialogOpen(true);
-  }
+  }, [router]);
 
   const onSave = (updatedStudent: Partial<Student>) => {
-    if(currentUser && currentUser.id === updatedStudent.id) {
-        const updatedUser = { ...currentUser, ...updatedStudent } as Student;
-        setCurrentUser(updatedUser);
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-    }
+    const updatedUser = { ...currentUser, ...updatedStudent } as Student;
+    setCurrentUser(updatedUser);
+    localStorage.setItem("currentUser", JSON.stringify(updatedUser));
     
-    fetchStudents();
     setIsDialogOpen(false);
-    setEditingStudent(null);
     toast({
         title: "Profile Saved!",
         description: "Your profile has been successfully saved.",
     });
   }
 
+  const handleEdit = () => {
+    setIsDialogOpen(true);
+  }
+  
+  const handleLogout = () => {
+    localStorage.removeItem("currentUser");
+    setCurrentUser(null);
+    router.push('/auth');
+    toast({ title: "Logged Out", description: "You have been successfully logged out." });
+  }
+
+  if (!currentUser) {
+    return (
+        <SidebarInset>
+            <PageHeader title="My Profile" description="View and manage your profile." />
+            <main className="p-6 lg:p-8 flex flex-col items-center justify-center text-center">
+                <p className="mb-4">You need to be logged in to see your profile.</p>
+                <Link href="/auth">
+                    <Button>Login/Sign Up</Button>
+                </Link>
+            </main>
+        </SidebarInset>
+    )
+  }
+
   return (
     <SidebarInset>
-      <PageHeader
-        title="Student Profiles"
-        description="Get to know your fellow classmates and their interests."
-      />
-      <main className="p-6 lg:p-8">
-        <div className="flex justify-between items-center mb-6">
-            {!currentUser && (
-              <div className="flex items-center gap-4">
-                  <p>Want to be listed here? </p>
-                  <Link href="/auth">
-                    <Button variant="outline" size="sm">Login or Sign Up</Button>
-                  </Link>
-              </div>
-            )}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Profile</DialogTitle>
-                </DialogHeader>
-                <StudentForm student={editingStudent} onSave={onSave} onOpenChange={setIsDialogOpen} />
-              </DialogContent>
-            </Dialog>
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {students.map((student) => (
-            <Card key={student.id} className="flex flex-col text-center hover:shadow-lg transition-shadow">
+      <PageHeader title="My Profile" description="View and manage your profile." />
+      <main className="p-6 lg:p-8 flex justify-center">
+        <Card className="w-full max-w-2xl text-center">
             <CardHeader className="items-center">
                 <Avatar className="w-24 h-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
-                <AvatarImage src={student.avatar} alt={student.name} data-ai-hint={student.hint || 'person'} />
-                <AvatarFallback>{student.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
+                    <AvatarImage src={currentUser.avatar} alt={currentUser.name} data-ai-hint={currentUser.hint || 'person'} />
+                    <AvatarFallback>{currentUser.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
                 </Avatar>
-                <CardTitle className="font-headline">{student.name}</CardTitle>
-                <p className="text-muted-foreground">{student.major}</p>
+                <CardTitle className="font-headline">{currentUser.name}</CardTitle>
+                <CardDescription>{currentUser.major}</CardDescription>
             </CardHeader>
-            <CardContent className="flex-grow space-y-4">
-                {student.bio && <p className="text-sm text-foreground/80 italic">"{student.bio}"</p>}
+            <CardContent className="space-y-6">
+                {currentUser.bio && (
+                    <div>
+                        <h3 className="font-semibold mb-2 text-lg text-foreground">Bio</h3>
+                        <p className="text-foreground/80 italic">"{currentUser.bio}"</p>
+                    </div>
+                )}
                 
-                {student.interests && student.interests.length > 0 && (
+                {currentUser.interests && currentUser.interests.length > 0 && (
                   <div>
-                    <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
+                    <h3 className="font-semibold mb-2 text-lg text-foreground">Interests</h3>
                     <div className="flex flex-wrap justify-center gap-2">
-                    {student.interests.map((interest) => (
+                    {currentUser.interests.map((interest) => (
                         <Badge key={interest} variant="secondary">{interest}</Badge>
                     ))}
                     </div>
                   </div>
                 )}
 
-                {student.hobbies && student.hobbies.length > 0 && (
+                {currentUser.hobbies && currentUser.hobbies.length > 0 && (
                   <div>
-                    <p className="font-semibold mb-2 text-sm text-foreground">Hobbies</p>
+                    <h3 className="font-semibold mb-2 text-lg text-foreground">Hobbies</h3>
                     <div className="flex flex-wrap justify-center gap-2">
-                    {student.hobbies.map((hobby) => (
+                    {currentUser.hobbies.map((hobby) => (
                         <Badge key={hobby} variant="outline">{hobby}</Badge>
                     ))}
                     </div>
                   </div>
                 )}
             </CardContent>
-            {currentUser && currentUser.uid === student.uid && (
-              <CardFooter className="justify-center">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(student)}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                  </Button>
-              </CardFooter>
-            )}
+            <CardFooter className="justify-center gap-4">
+                <Button onClick={handleEdit}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Profile
+                </Button>
+                <Button variant="outline" onClick={handleLogout}>Log Out</Button>
+            </CardFooter>
             </Card>
-        ))}
-        </div>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Your Profile</DialogTitle>
+                </DialogHeader>
+                <StudentForm student={currentUser} onSave={onSave} onOpenChange={setIsDialogOpen} />
+              </DialogContent>
+            </Dialog>
       </main>
     </SidebarInset>
   );
 }
+

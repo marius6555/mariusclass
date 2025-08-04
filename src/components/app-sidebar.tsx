@@ -19,12 +19,14 @@ import {
   Mail,
   GraduationCap,
   LogIn,
+  User,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 const links = [
   { href: "/", label: "Home", icon: Home },
+  { href: "/profile", label: "My Profile", icon: User },
   { href: "/students", label: "Student Profiles", icon: Users },
   { href: "/projects", label: "Project Hub", icon: FolderKanban },
   { href: "/events", label: "Events/Updates", icon: CalendarClock },
