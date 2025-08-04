@@ -7,20 +7,25 @@ import { Download, Link as LinkIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 const resources = {
-  "Study Guides": [
-    { title: "Midterm Study Guide", type: "file", href: "#" },
-    { title: "Final Exam Review Sheet", type: "file", href: "#" },
-    { title: "Key Concepts Summary", type: "file", href: "#" },
+  "Learning Platform": [
+    { title: "Interactive Coding Platform", type: "link", href: "#" },
+    { title: "AI-Powered Course Assistant", type: "link", href: "#" },
+    { title: "Video Tutorial Library", type: "link", href: "#" },
   ],
-  "Lecture Notes": [
-    { title: "Week 1-3 Slides", type: "file", href: "#" },
-    { title: "Week 4-6 Slides", type: "file", href: "#" },
-    { title: "Guest Lecture Notes", type: "file", href: "#" },
+  "Tools You Must Try": [
+    { title: "Collaborative Code Editor", type: "link", href: "#" },
+    { title: "Project Management Dashboard", type: "link", href: "#" },
+    { title: "API Prototyping Tool", type: "link", href: "#" },
   ],
-  "Useful Links": [
-    { title: "Official Documentation", type: "link", href: "#" },
-    { title: "Online Coding Tutorials", type: "link", href: "#" },
-    { title: "Design Pattern Examples", type: "link", href: "#" },
+  "Project Ideas": [
+    { title: "Beginner Project Ideas", type: "file", href: "#" },
+    { title: "Intermediate Project Concepts", type: "file", href: "#" },
+    { title: "Advanced Capstone Projects", type: "file", href: "#" },
+  ],
+  "Upcoming Tech Challenges": [
+    { title: "Monthly Hackathon", type: "link", href: "#" },
+    { title: "Weekly Coding Puzzles", type: "link", href: "#" },
+    { title: "Annual Innovation Fair", type: "link", href: "#" },
   ],
 };
 
@@ -32,7 +37,7 @@ export default function ResourcesPage() {
         description="A curated collection of study materials and helpful links."
       />
       <main className="p-6 lg:p-8">
-        <Accordion type="single" collapsible defaultValue="Study Guides" className="w-full space-y-4">
+        <Accordion type="single" collapsible defaultValue="Learning Platform" className="w-full space-y-4">
           {Object.entries(resources).map(([category, items]) => (
             <AccordionItem value={category} key={category} className="border-none">
               <Card>
