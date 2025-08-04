@@ -8,8 +8,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Pencil, PlusCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,10 +17,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { db, storage, auth } from "@/lib/firebase";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, addDoc, query, where } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
+import { onAuthStateChanged } from "firebase/auth";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -154,32 +155,51 @@ export default function StudentsPage() {
   const fetchStudents = async () => {
     try {
         const querySnapshot = await getDocs(collection(db, "students"));
-        if (querySnapshot.empty) {
-            // Firestore is empty, no need to add defaults anymore
-        } else {
-            const studentsList = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            } as Student));
-            setStudents(studentsList);
+        const studentsList = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as Student));
+        setStudents(studentsList);
+        
+        // After fetching students, update current user's full profile
+        const storedUser = localStorage.getItem("currentUser");
+        if (storedUser) {
+          const user: Student = JSON.parse(storedUser);
+          const userProfile = studentsList.find(s => s.uid === user.uid);
+          if (userProfile) {
+            const fullCurrentUser = { ...user, ...userProfile };
+            setCurrentUser(fullCurrentUser);
+            localStorage.setItem('currentUser', JSON.stringify(fullCurrentUser));
+          }
         }
+
     } catch(e) {
-        console.error("Error fetching students, maybe firebase config is not set?", e);
+        console.error("Error fetching students:", e);
     }
   };
 
   useEffect(() => {
     fetchStudents();
 
-    try {
-      const storedUser = localStorage.getItem("currentUser");
-      if (storedUser) {
-        setCurrentUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-      console.error("Failed to parse from localStorage", error);
-      setCurrentUser(null);
-    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            const storedUser = localStorage.getItem("currentUser");
+            if(storedUser) {
+                const studentData = JSON.parse(storedUser);
+                if(studentData.uid !== user.uid) { // User has changed
+                    localStorage.removeItem("currentUser");
+                    fetchStudents(); // Re-fetch students and profiles
+                } else {
+                   setCurrentUser(studentData);
+                }
+            }
+        } else {
+            localStorage.removeItem("currentUser");
+            setCurrentUser(null);
+        }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleEdit = (student: Student) => {
@@ -187,21 +207,56 @@ export default function StudentsPage() {
     setIsDialogOpen(true);
   }
 
-  const onSave = (updatedStudent: Partial<Student>) => {
-    if(currentUser && currentUser.id === updatedStudent.id) {
-        const updatedUser = { ...currentUser, ...updatedStudent } as Student;
-        setCurrentUser(updatedUser);
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+  const handleAddProfile = () => {
+    const firebaseUser = auth.currentUser;
+    if (firebaseUser) {
+      setEditingStudent({
+        id: '', // Will be set on save
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: firebaseUser.displayName || '',
+        avatar: firebaseUser.photoURL || `https://placehold.co/100x100.png`,
+        initials: firebaseUser.displayName?.split(" ").map(n => n[0]).join("") || '??',
+        major: '',
+        interests: [],
+        hobbies: [],
+        bio: '',
+        hint: 'person'
+      });
+      setIsDialogOpen(true);
+    }
+  };
+
+  const onSave = async (updatedStudent: Partial<Student>) => {
+    const firebaseUser = auth.currentUser;
+    if(!firebaseUser) return;
+
+    // Check if it's a new profile
+    if(!updatedStudent.id) { 
+        const { id, ...newStudentData} = updatedStudent; // remove id before saving
+        const studentData = {
+          ...newStudentData,
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+        };
+        const docRef = await addDoc(collection(db, "students"), studentData);
+        toast({ title: "Profile Created!", description: "Your profile has been created." });
+
+    } else { // It's an existing profile update
+        if(currentUser && currentUser.id === updatedStudent.id) {
+            const updatedUser = { ...currentUser, ...updatedStudent } as Student;
+            setCurrentUser(updatedUser);
+            localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+        }
+        toast({ title: "Profile Saved!", description: "Your profile has been successfully saved." });
     }
     
     fetchStudents();
     setIsDialogOpen(false);
     setEditingStudent(null);
-    toast({
-        title: "Profile Saved!",
-        description: "Your profile has been successfully saved.",
-    });
   }
+  
+  const userHasProfile = students.some(s => s.uid === currentUser?.uid);
 
   return (
     <SidebarInset>
@@ -211,23 +266,29 @@ export default function StudentsPage() {
       />
       <main className="p-6 lg:p-8">
         <div className="flex justify-between items-center mb-6">
-            {!currentUser && (
+            {!currentUser ? (
               <div className="flex items-center gap-4">
                   <p>Want to be listed here? </p>
                   <Link href="/auth">
                     <Button variant="outline" size="sm">Login or Sign Up</Button>
                   </Link>
               </div>
-            )}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Profile</DialogTitle>
-                </DialogHeader>
-                <StudentForm student={editingStudent} onSave={onSave} onOpenChange={setIsDialogOpen} />
-              </DialogContent>
-            </Dialog>
+            ) : !userHasProfile && (
+              <Button onClick={handleAddProfile}>
+                <PlusCircle className="mr-2" />
+                Create Your Profile
+              </Button>
+            )
+          }
         </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{editingStudent?.id ? 'Edit Profile' : 'Create Your Profile'}</DialogTitle>
+            </DialogHeader>
+            <StudentForm student={editingStudent} onSave={onSave} onOpenChange={setIsDialogOpen} />
+            </DialogContent>
+        </Dialog>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {students.map((student) => (
             <Card key={student.id} className="flex flex-col text-center hover:shadow-lg transition-shadow">
@@ -279,3 +340,5 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
+
+    
