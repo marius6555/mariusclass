@@ -1,7 +1,7 @@
 
 'use client'
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +15,9 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
@@ -24,7 +25,7 @@ const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   major: z.string().min(2, "Major must be at least 2 characters."),
   interests: z.string().min(2, "Please list at least one interest."),
-  avatar: z.string().url("Please enter a valid image URL.").optional().or(z.literal('')),
+  avatar: z.any(),
 });
 
 export type Student = {
@@ -46,6 +47,8 @@ const defaultStudents: Omit<Student, 'id' | 'initials' | 'hint'>[] = [
 ];
 
 function StudentForm({ student, onSave, onOpenChange }: { student?: Student | null, onSave: (updatedStudent: Partial<Student>) => void, onOpenChange: (open:boolean) => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -59,11 +62,20 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!student) return;
     try {
-      const studentData = {
+      let avatarUrl = student.avatar;
+      const avatarFile = values.avatar?.[0];
+
+      if (avatarFile && student.uid) {
+        const storageRef = ref(storage, `avatars/${student.uid}/${avatarFile.name}`);
+        const snapshot = await uploadBytes(storageRef, avatarFile);
+        avatarUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      const studentData:Partial<Student> = {
         name: values.name,
         major: values.major,
         interests: values.interests.split(",").map(i => i.trim()),
-        avatar: values.avatar || `https://placehold.co/100x100.png`,
+        avatar: avatarUrl,
       };
 
       const studentDocRef = doc(db, "students", student.id);
@@ -100,10 +112,12 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
             <FormMessage />
           </FormItem>
         )} />
-         <FormField control={form.control} name="avatar" render={({ field }) => (
+         <FormField control={form.control} name="avatar" render={({ field: { onChange, value, ...rest } }) => (
           <FormItem>
-            <FormLabel>Avatar URL</FormLabel>
-            <FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl>
+            <FormLabel>Avatar</FormLabel>
+            <FormControl>
+                <Input type="file" accept="image/*" onChange={(e) => onChange(e.target.files)} {...rest} />
+            </FormControl>
             <FormMessage />
           </FormItem>
         )} />
