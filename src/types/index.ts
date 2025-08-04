@@ -11,4 +11,9 @@ export type Student = {
   uid?: string;
   bio?: string;
   hobbies?: string[];
+  github?: string;
+  whatsapp?: string;
+  facebook?: string;
+  instagram?: string;
+  linkedin?: string;
 };

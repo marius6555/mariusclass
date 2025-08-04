@@ -20,7 +20,7 @@ import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storag
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Briefcase, PlusCircle, Trash2, Edit, Camera, Eye, ExternalLink } from 'lucide-react';
+import { Mail, Briefcase, PlusCircle, Trash2, Edit, Camera, Eye, ExternalLink, Github, Linkedin, Instagram, Facebook } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -34,6 +34,11 @@ const formSchema = z.object({
   bio: z.string().min(10, "Bio must be at least 10 characters.").optional(),
   hobbies: z.string().min(2, "Please list at least one hobby.").optional(),
   avatar: z.any().optional(),
+  github: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
+  linkedin: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
+  instagram: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
+  facebook: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
+  whatsapp: z.string().min(10, "Please enter a valid WhatsApp number.").optional().or(z.literal('')),
 });
 
 type Project = {
@@ -53,6 +58,11 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
       bio: student?.bio || "",
       hobbies: student?.hobbies?.join(", ") || "",
       avatar: null,
+      github: student?.github || "",
+      linkedin: student?.linkedin || "",
+      instagram: student?.instagram || "",
+      facebook: student?.facebook || "",
+      whatsapp: student?.whatsapp || "",
     },
   });
   const [preview, setPreview] = useState<string | null>(student?.avatar || null);
@@ -120,11 +130,49 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
         <FormField control={form.control} name="hobbies" render={({ field }) => (
           <FormItem><FormLabel>Hobbies (comma-separated)</FormLabel><FormControl><Input placeholder="Reading, Hiking" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
+        
+        <Separator/>
+        <h3 className="font-semibold text-center">Social Links</h3>
+
+        <FormField control={form.control} name="github" render={({ field }) => (
+          <FormItem><FormLabel className="flex items-center gap-2"><Github className="w-4 h-4"/> GitHub</FormLabel><FormControl><Input placeholder="https://github.com/your-username" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+         <FormField control={form.control} name="linkedin" render={({ field }) => (
+          <FormItem><FormLabel className="flex items-center gap-2"><Linkedin className="w-4 h-4"/> LinkedIn</FormLabel><FormControl><Input placeholder="https://linkedin.com/in/your-profile" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="instagram" render={({ field }) => (
+          <FormItem><FormLabel className="flex items-center gap-2"><Instagram className="w-4 h-4"/> Instagram</FormLabel><FormControl><Input placeholder="https://instagram.com/your-username" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="facebook" render={({ field }) => (
+          <FormItem><FormLabel className="flex items-center gap-2"><Facebook className="w-4 h-4"/> Facebook</FormLabel><FormControl><Input placeholder="https://facebook.com/your-profile" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="whatsapp" render={({ field }) => (
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                WhatsApp
+            </FormLabel>
+            <FormControl><Input placeholder="Your WhatsApp number" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+
         <Button type="submit" className="w-full">Save Profile</Button>
       </form>
     </Form>
   );
 }
+
+const socialIconMap: { [key: string]: React.ReactNode } = {
+  github: <Github className="w-5 h-5" />,
+  linkedin: <Linkedin className="w-5 h-5" />,
+  instagram: <Instagram className="w-5 h-5" />,
+  facebook: <Facebook className="w-5 h-5" />,
+  whatsapp: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+  ),
+};
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -171,6 +219,15 @@ export default function StudentsPage() {
 
     if (data.avatar && data.avatar.startsWith('data:image')) {
       const storageRef = ref(storage, `avatars/${currentUser.uid}`);
+      if (avatarUrl && avatarUrl.includes('firebasestorage')) {
+          try {
+            await deleteObject(ref(storage, avatarUrl));
+          } catch(e:any) {
+              if (e.code !== 'storage/object-not-found') {
+                  console.error("Could not delete old avatar", e);
+              }
+          }
+      }
       await uploadString(storageRef, data.avatar, 'data_url');
       avatarUrl = await getDownloadURL(storageRef);
     }
@@ -183,23 +240,24 @@ export default function StudentsPage() {
       initials: data.name.split(" ").map((n:string) => n[0]).join(""),
       hint: 'person',
     };
-    delete studentData.avatar;
-    delete studentData.id;
+    delete studentData.avatar; // this is the base64 string, not the URL
   
     try {
-      let updatedStudent: Student;
+      let updatedStudentDoc: Student;
       if (isNew) {
         const docRef = await addDoc(collection(db, "students"), studentData);
-        updatedStudent = { id: docRef.id, ...studentData };
+        updatedStudentDoc = { id: docRef.id, ...studentData };
         toast({ title: "Profile Created!", description: "Your student profile is now live." });
       } else if(studentToUpdate?.id) {
         const studentRef = doc(db, "students", studentToUpdate.id);
         await updateDoc(studentRef, studentData);
-        updatedStudent = { ...studentToUpdate, ...studentData };
+        updatedStudentDoc = { ...studentToUpdate, ...studentData };
         toast({ title: "Profile Updated!", description: "Your changes have been saved." });
       } else {
         throw new Error("Could not find student profile to update.");
       }
+
+      const updatedStudent: Student = { ...currentUser, ...updatedStudentDoc };
 
       setCurrentUser(updatedStudent);
       localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
@@ -293,7 +351,7 @@ export default function StudentsPage() {
         )}
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                 <DialogTitle>{editingStudent ? "Edit Your Profile" : "Create Your Profile"}</DialogTitle>
                 </DialogHeader>
@@ -316,6 +374,13 @@ export default function StudentsPage() {
                                 </Avatar>
                                 <h3 className="font-bold text-lg">{viewingStudent.name}</h3>
                                 <p className="text-muted-foreground">{viewingStudent.major}</p>
+                                <div className="flex justify-center gap-3 mt-4">
+                                  {viewingStudent.github && <a href={viewingStudent.github} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">{socialIconMap.github}</a>}
+                                  {viewingStudent.linkedin && <a href={viewingStudent.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">{socialIconMap.linkedin}</a>}
+                                  {viewingStudent.instagram && <a href={viewingStudent.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">{socialIconMap.instagram}</a>}
+                                  {viewingStudent.facebook && <a href={viewingStudent.facebook} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">{socialIconMap.facebook}</a>}
+                                  {viewingStudent.whatsapp && <a href={`https://wa.me/${viewingStudent.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">{socialIconMap.whatsapp}</a>}
+                                </div>
                                 {viewingStudent.email && (
                                      <a href={`mailto:${viewingStudent.email}`} className="text-sm text-primary hover:underline flex items-center justify-center gap-2 mt-2">
                                         <Mail className="w-4 h-4"/>{viewingStudent.email}
