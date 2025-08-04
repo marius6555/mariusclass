@@ -24,8 +24,6 @@ const signUpSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Please enter a valid email."),
   password: z.string().min(6, "Password must be at least 6 characters."),
-  major: z.string().min(2, "Major is required."),
-  interests: z.string().min(2, "At least one interest is required."),
 });
 
 const loginSchema = z.object({
@@ -41,7 +39,7 @@ export default function Home() {
 
   const signUpForm = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { name: "", email: "", password: "", major: "", interests: "" },
+    defaultValues: { name: "", email: "", password: "" },
   });
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
@@ -58,8 +56,8 @@ export default function Home() {
         uid: user.uid,
         email: values.email,
         name: values.name,
-        major: values.major,
-        interests: values.interests.split(",").map(i => i.trim()),
+        major: "",
+        interests: [],
         avatar: `https://placehold.co/100x100.png`,
         initials: values.name.split(" ").map(n => n[0]).join(""),
         hint: 'person',
@@ -175,12 +173,6 @@ export default function Home() {
                             )} />
                             <FormField control={signUpForm.control} name="password" render={({ field }) => (
                             <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={signUpForm.control} name="major" render={({ field }) => (
-                            <FormItem><FormLabel>Major</FormLabel><FormControl><Input placeholder="Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={signUpForm.control} name="interests" render={({ field }) => (
-                            <FormItem><FormLabel>Interests (comma-separated)</FormLabel><FormControl><Input placeholder="AI, Web Dev" {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
                             <Button type="submit" className="w-full">Create Account</Button>
                         </form>
