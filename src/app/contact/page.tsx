@@ -23,6 +23,7 @@ import type { Student } from "@/types";
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
+  whatsapp: z.string().optional(),
   message: z.string().min(10, { message: "Message must be at least 10 characters." }).max(500),
 });
 
@@ -56,6 +57,7 @@ export default function ContactPage() {
     defaultValues: {
       name: "",
       email: "",
+      whatsapp: "",
       message: "",
     },
   });
@@ -142,6 +144,19 @@ export default function ContactPage() {
                         <FormLabel>Email Address</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="ada.l@university.edu" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="whatsapp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WhatsApp Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+1234567890" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
