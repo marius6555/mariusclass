@@ -30,7 +30,7 @@ export default function RootLayout({
                 </SidebarProvider>
             </div>
             <footer className="text-center p-4 text-sm italic text-muted-foreground border-t">
-                computer science class project were ideas meet execution
+                Where innovation begins and ideas take flight.
             </footer>
         </div>
         <Toaster />
