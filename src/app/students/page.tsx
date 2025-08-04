@@ -12,6 +12,7 @@ import { Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,6 +27,8 @@ const formSchema = z.object({
   major: z.string().min(2, "Major must be at least 2 characters."),
   interests: z.string().min(2, "Please list at least one interest."),
   avatar: z.any(),
+  bio: z.string().max(200, "Bio must be 200 characters or less.").optional(),
+  hobbies: z.string().optional(),
 });
 
 export type Student = {
@@ -38,13 +41,9 @@ export type Student = {
   hint: string;
   email?: string;
   uid?: string;
+  bio?: string;
+  hobbies?: string[];
 };
-
-const defaultStudents: Omit<Student, 'id' | 'initials' | 'hint'>[] = [
-    { name: "Alice Johnson", major: "Computer Science", interests: ["AI", "Web Dev", "UX Design"], avatar: "https://placehold.co/100x100.png", email: "alice@example.com" },
-    { name: "Bob Williams", major: "Data Science", interests: ["Machine Learning", "Statistics"], avatar: "https://placehold.co/100x100.png", email: "bob@example.com" },
-    { name: "Charlie Brown", major: "Software Engineering", interests: ["Mobile Apps", "Game Dev"], avatar: "https://placehold.co/100x100.png", email: "charlie@example.com" },
-];
 
 function StudentForm({ student, onSave, onOpenChange }: { student?: Student | null, onSave: (updatedStudent: Partial<Student>) => void, onOpenChange: (open:boolean) => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,8 +53,10 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
     defaultValues: {
       name: student?.name || "",
       major: student?.major || "",
-      interests: student?.interests.join(", ") || "",
+      interests: student?.interests?.join(", ") || "",
       avatar: student?.avatar || "",
+      bio: student?.bio || "",
+      hobbies: student?.hobbies?.join(", ") || "",
     },
   });
 
@@ -76,6 +77,8 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
         major: values.major,
         interests: values.interests.split(",").map(i => i.trim()),
         avatar: avatarUrl,
+        bio: values.bio,
+        hobbies: values.hobbies?.split(",").map(i => i.trim()) || [],
       };
 
       const studentDocRef = doc(db, "students", student.id);
@@ -105,12 +108,26 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
             <FormMessage />
           </FormItem>
         )} />
+        <FormField control={form.control} name="bio" render={({ field }) => (
+            <FormItem>
+                <FormLabel>Bio</FormLabel>
+                <FormControl><Textarea placeholder="Tell us a little about yourself." {...field} /></FormControl>
+                <FormMessage />
+            </FormItem>
+        )} />
         <FormField control={form.control} name="interests" render={({ field }) => (
           <FormItem>
             <FormLabel>Interests (comma-separated)</FormLabel>
             <FormControl><Input placeholder="AI, Web Dev, UX Design" {...field} /></FormControl>
             <FormMessage />
           </FormItem>
+        )} />
+        <FormField control={form.control} name="hobbies" render={({ field }) => (
+            <FormItem>
+                <FormLabel>Hobbies (comma-separated)</FormLabel>
+                <FormControl><Input placeholder="Reading, hiking, coding" {...field} /></FormControl>
+                <FormMessage />
+            </FormItem>
         )} />
          <FormField control={form.control} name="avatar" render={({ field: { onChange, value, ...rest } }) => (
           <FormItem>
@@ -226,13 +243,28 @@ export default function StudentsPage() {
                 <CardTitle className="font-headline">{student.name}</CardTitle>
                 <p className="text-muted-foreground">{student.major}</p>
             </CardHeader>
-            <CardContent className="flex-grow">
-                <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                {student.interests.map((interest) => (
-                    <Badge key={interest} variant="secondary">{interest}</Badge>
-                ))}
+            <CardContent className="flex-grow space-y-4">
+                {student.bio && <p className="text-sm text-foreground/80 italic">"{student.bio}"</p>}
+                
+                <div>
+                  <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                  {student.interests?.map((interest) => (
+                      <Badge key={interest} variant="secondary">{interest}</Badge>
+                  ))}
+                  </div>
                 </div>
+
+                {student.hobbies && student.hobbies.length > 0 && (
+                  <div>
+                    <p className="font-semibold mb-2 text-sm text-foreground">Hobbies</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                    {student.hobbies.map((hobby) => (
+                        <Badge key={hobby} variant="outline">{hobby}</Badge>
+                    ))}
+                    </div>
+                  </div>
+                )}
             </CardContent>
             <CardFooter className="justify-center">
                  <Button variant="outline" size="sm" onClick={() => handleEdit(student)} disabled={!currentUser || currentUser.uid !== student.uid}>

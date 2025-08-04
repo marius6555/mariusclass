@@ -58,6 +58,8 @@ export default function AuthPage() {
         avatar: `https://placehold.co/100x100.png`,
         initials: values.name.split(" ").map(n => n[0]).join(""),
         hint: 'person',
+        bio: "",
+        hobbies: [],
       };
       
       const docRef = await addDoc(collection(db, "students"), studentData);
