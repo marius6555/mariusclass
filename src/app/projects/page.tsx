@@ -1,27 +1,154 @@
 'use client'
 
+import React, { useState, useEffect } from 'react';
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, query } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import type { Student } from '../students/page';
 
-const projects = [
-  { title: "AI-Powered Chatbot", category: "AI", description: "A chatbot using NLP to answer student queries about the course.", link: "#", image: "https://placehold.co/600x400.png", hint: "robot abstract", tags: ["Python", "NLTK", "Flask"] },
-  { title: "E-commerce Website", category: "Web Dev", description: "A full-stack e-commerce platform for selling course merchandise.", link: "#", image: "https://placehold.co/600x400.png", hint: "shopping cart", tags: ["React", "Node.js", "MongoDB"] },
-  { title: "Mobile Fitness Tracker", category: "Mobile", description: "An iOS/Android app to track workouts and nutrition.", link: "#", image: "https://placehold.co/600x400.png", hint: "mobile phone", tags: ["React Native", "Firebase"] },
-  { title: "Data Visualization Dashboard", category: "Data Science", description: "An interactive dashboard visualizing student performance data.", link: "#", image: "https://placehold.co/600x400.png", hint: "charts graphs", tags: ["D3.js", "Tableau"] },
-  { title: "Secure File Sharing System", category: "Cybersecurity", description: "A system for encrypted file sharing and storage.", link: "#", image: "https://placehold.co/600x400.png", hint: "lock security", tags: ["Cryptography", "Go"] },
-  { title: "Campus Navigation App", category: "Mobile", description: "A mobile app providing indoor navigation for the university campus.", link: "#", image: "https://placehold.co/600x400.png", hint: "map navigation", tags: ["Swift", "ARKit"] },
+const formSchema = z.object({
+  title: z.string().min(2, "Title must be at least 2 characters."),
+  category: z.string().min(2, "Category must be at least 2 characters."),
+  description: z.string().min(10, "Description must be at least 10 characters."),
+  link: z.string().url("Please enter a valid URL."),
+  image: z.string().url("Please enter a valid image URL.").optional().or(z.literal('')),
+  tags: z.string().min(2, "Please list at least one tag."),
+});
+
+type Project = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  link: string;
+  image: string;
+  tags: string[];
+  hint: string;
+  author: string;
+};
+
+const defaultProjects: Omit<Project, 'id'>[] = [
+  { title: "AI-Powered Chatbot", category: "AI", description: "A chatbot using NLP to answer student queries about the course.", link: "#", image: "https://placehold.co/600x400.png", hint: "robot abstract", tags: ["Python", "NLTK", "Flask"], author: "Alice Johnson" },
+  { title: "E-commerce Website", category: "Web Dev", description: "A full-stack e-commerce platform for selling course merchandise.", link: "#", image: "https://placehold.co/600x400.png", hint: "shopping cart", tags: ["React", "Node.js", "MongoDB"], author: "Bob Williams" },
+  { title: "Mobile Fitness Tracker", category: "Mobile", description: "An iOS/Android app to track workouts and nutrition.", link: "#", image: "https://placehold.co/600x400.png", hint: "mobile phone", tags: ["React Native", "Firebase"], author: "Charlie Brown" },
+  { title: "Data Visualization Dashboard", category: "Data Science", description: "An interactive dashboard visualizing student performance data.", link: "#", image: "https://placehold.co/600x400.png", hint: "charts graphs", tags: ["D3.js", "Tableau"], author: "Alice Johnson" },
+  { title: "Secure File Sharing System", category: "Cybersecurity", description: "A system for encrypted file sharing and storage.", link: "#", image: "https://placehold.co/600x400.png", hint: "lock security", tags: ["Cryptography", "Go"], author: "Bob Williams" },
+  { title: "Campus Navigation App", category: "Mobile", description: "A mobile app providing indoor navigation for the university campus.", link: "#", image: "https://placehold.co/600x400.png", hint: "map navigation", tags: ["Swift", "ARKit"], author: "Charlie Brown" },
 ];
 
 const categories = ["All", "AI", "Web Dev", "Mobile", "Data Science", "Cybersecurity"];
 
+function ProjectForm({ onSave, onOpenChange, author }: { onSave: () => void, onOpenChange: (open: boolean) => void, author: string }) {
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { title: "", category: "", description: "", link: "", image: "", tags: "" },
+  });
+
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      const projectData = {
+        title: values.title,
+        category: values.category,
+        description: values.description,
+        link: values.link,
+        image: values.image || "https://placehold.co/600x400.png",
+        tags: values.tags.split(",").map(t => t.trim()),
+        hint: 'abstract',
+        author,
+      };
+      await addDoc(collection(db, "projects"), projectData);
+      onSave();
+      onOpenChange(false);
+      form.reset();
+    } catch (error) {
+      console.error("Error saving project: ", error);
+    }
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormField control={form.control} name="title" render={({ field }) => (
+          <FormItem><FormLabel>Project Title</FormLabel><FormControl><Input placeholder="AI-Powered Chatbot" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="category" render={({ field }) => (
+          <FormItem><FormLabel>Category</FormLabel><FormControl><Input placeholder="AI" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="description" render={({ field }) => (
+          <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="A chatbot using NLP..." {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="link" render={({ field }) => (
+          <FormItem><FormLabel>Project URL</FormLabel><FormControl><Input placeholder="https://github.com/user/project" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="image" render={({ field }) => (
+          <FormItem><FormLabel>Image URL</FormLabel><FormControl><Input placeholder="https://placehold.co/600x400.png" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="tags" render={({ field }) => (
+          <FormItem><FormLabel>Tags (comma-separated)</FormLabel><FormControl><Input placeholder="Python, NLTK, Flask" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <Button type="submit" className="w-full">Add Project</Button>
+      </form>
+    </Form>
+  );
+}
+
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<Student | null>(null);
+  const { toast } = useToast();
+
+  const fetchProjects = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "projects"));
+      if (querySnapshot.empty) {
+        for (const proj of defaultProjects) {
+          await addDoc(collection(db, "projects"), proj);
+        }
+        fetchProjects();
+      } else {
+        const projectsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        setProjects(projectsList);
+      }
+    } catch (e) {
+      console.error("Error fetching projects: ", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        setCurrentUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error("Failed to parse from localStorage", error);
+    }
+  }, []);
+
+  const onSave = () => {
+    fetchProjects();
+    setIsDialogOpen(false);
+    toast({ title: "Project Added!", description: "Your project has been added to the hub." });
+  };
+  
   return (
     <SidebarInset>
       <PageHeader
@@ -29,6 +156,25 @@ export default function ProjectsPage() {
         description="Discover innovative projects by students."
       />
       <main className="p-6 lg:p-8">
+        <div className="flex justify-end mb-6">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button disabled={!currentUser}>
+                  <PlusCircle className="mr-2"/> Add Project
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Your Project</DialogTitle>
+                </DialogHeader>
+                {currentUser ? (
+                    <ProjectForm onSave={onSave} onOpenChange={setIsDialogOpen} author={currentUser.name} />
+                ) : (
+                    <p className="text-center text-muted-foreground">Please log in on the Student Profiles page to add a project.</p>
+                )}
+              </DialogContent>
+            </Dialog>
+        </div>
         <Tabs defaultValue="All" className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-6">
             {categories.map((category) => (
@@ -41,7 +187,7 @@ export default function ProjectsPage() {
                 {projects
                   .filter((p) => category === "All" || p.category === category)
                   .map((project) => (
-                    <Card key={project.title} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                    <Card key={project.id} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
                       <div className="aspect-video relative">
                         <Image src={project.image} alt={project.title} fill className="object-cover" data-ai-hint={project.hint} />
                       </div>
@@ -53,6 +199,7 @@ export default function ProjectsPage() {
                         <div className="flex flex-wrap gap-2">
                           {project.tags.map(tag => <Badge key={tag} variant="secondary">{tag}</Badge>)}
                         </div>
+                         <p className="text-xs text-muted-foreground mt-4">By: {project.author}</p>
                       </CardContent>
                       <CardFooter>
                         <Link href={project.link} target="_blank" className="w-full">

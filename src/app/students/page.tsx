@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import React, { useState, useEffect } from "react";
@@ -29,7 +30,7 @@ const formSchema = z.object({
   avatar: z.string().url("Please enter a valid image URL.").optional().or(z.literal('')),
 });
 
-type Student = {
+export type Student = {
   id: string;
   name: string;
   major: string;
