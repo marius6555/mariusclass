@@ -42,7 +42,7 @@ const eventConfig: { [key: string]: { icon: React.ReactNode; variant: BadgeProps
   announcement: { icon: <Milestone className="h-4 w-4" />, variant: 'secondary' },
 };
 
-const ADMIN_EMAIL = "admin@university.edu";
+const ADMIN_EMAIL = "tingiya730@gmail.com";
 
 function EventForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange: (open: boolean) => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
