@@ -280,14 +280,16 @@ export default function StudentsPage() {
             <CardContent className="flex-grow space-y-4">
                 {student.bio && <p className="text-sm text-foreground/80 italic">"{student.bio}"</p>}
                 
-                <div>
-                  <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                  {student.interests?.map((interest) => (
-                      <Badge key={interest} variant="secondary">{interest}</Badge>
-                  ))}
+                {student.interests && student.interests.length > 0 && (
+                  <div>
+                    <p className="font-semibold mb-2 text-sm text-foreground">Interests</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                    {student.interests.map((interest) => (
+                        <Badge key={interest} variant="secondary">{interest}</Badge>
+                    ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {student.hobbies && student.hobbies.length > 0 && (
                   <div>
@@ -336,3 +338,5 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
+
+    
