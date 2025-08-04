@@ -172,11 +172,16 @@ export default function StudentsPage() {
         const storedUser = localStorage.getItem("currentUser");
         if (storedUser) {
           const user: Student = JSON.parse(storedUser);
+          // Sync with latest from DB
           const userProfile = studentsList.find(s => s.uid === user.uid);
           if (userProfile) {
             const fullCurrentUser = { ...user, ...userProfile };
             setCurrentUser(fullCurrentUser);
             localStorage.setItem('currentUser', JSON.stringify(fullCurrentUser));
+          } else {
+             // User exists in auth but not in DB, possibly deleted.
+             localStorage.removeItem("currentUser");
+             setCurrentUser(null);
           }
         }
 
@@ -188,22 +193,13 @@ export default function StudentsPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const storedUser = localStorage.getItem("currentUser");
-        if (storedUser) {
-          const studentData = JSON.parse(storedUser);
-          if (studentData.uid === user.uid) {
-            setCurrentUser(studentData);
-          } else { // Different user logged in
-            localStorage.removeItem("currentUser");
-            // We'll fetch their full profile below
-          }
-        }
         // Always fetch fresh student data on auth change
         fetchStudents();
       } else {
         localStorage.removeItem("currentUser");
         setCurrentUser(null);
         setStudents([]); // Clear students on logout
+        router.push('/auth');
       }
     });
 
@@ -242,10 +238,6 @@ export default function StudentsPage() {
 
         // 4. Cleanup UI
         toast({ title: "Profile Deleted", description: "Your profile has been permanently deleted." });
-        localStorage.removeItem("currentUser");
-        setCurrentUser(null);
-        setStudents(prev => prev.filter(s => s.id !== deletingStudent.id));
-        router.push('/auth');
         
     } catch (error: any) {
         console.error("Error deleting profile:", error);
@@ -281,33 +273,46 @@ export default function StudentsPage() {
     }
   };
 
-  const onSave = async (updatedStudent: Partial<Student>) => {
+  const onSave = async (updatedStudentData: Partial<Student>) => {
     const firebaseUser = auth.currentUser;
-    if(!firebaseUser) return;
+    if (!firebaseUser) return;
 
-    if(!updatedStudent.id) { 
-        const { id, ...newStudentData} = updatedStudent; 
-        const studentData = {
-          ...newStudentData,
-          uid: firebaseUser.uid,
-          email: firebaseUser.email?.toLowerCase(),
+    // Logic for CREATING a new profile
+    if (!updatedStudentData.id) {
+        const { id, ...newStudentData } = updatedStudentData;
+        const studentToCreate = {
+            ...newStudentData,
+            uid: firebaseUser.uid,
+            email: firebaseUser.email?.toLowerCase(),
         };
-        const docRef = await addDoc(collection(db, "students"), studentData);
+        const docRef = await addDoc(collection(db, "students"), studentToCreate);
+        
+        // After creating, update local state
+        const createdStudent = { id: docRef.id, ...studentToCreate } as Student;
+        setCurrentUser(createdStudent);
+        localStorage.setItem("currentUser", JSON.stringify(createdStudent));
+        setStudents(prev => [...prev, createdStudent]);
+        
         toast({ title: "Profile Created!", description: "Your profile has been created." });
-
-    } else { 
-        if(currentUser && currentUser.id === updatedStudent.id) {
-            const updatedUser = { ...currentUser, ...updatedStudent } as Student;
+    
+    // Logic for UPDATING an existing profile
+    } else {
+        if (currentUser && currentUser.id === updatedStudentData.id) {
+            const updatedUser = { ...currentUser, ...updatedStudentData } as Student;
+            
+            // Update local state first for immediate UI feedback
             setCurrentUser(updatedUser);
             localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+            setStudents(prev => prev.map(s => s.id === updatedUser.id ? updatedUser : s));
+
+            toast({ title: "Profile Saved!", description: "Your profile has been successfully saved." });
         }
-        toast({ title: "Profile Saved!", description: "Your profile has been successfully saved." });
     }
     
-    fetchStudents();
+    // Close the dialog
     setIsDialogOpen(false);
     setEditingStudent(null);
-  }
+};
   
   const userHasProfile = students.some(s => s.uid === currentUser?.uid);
 
