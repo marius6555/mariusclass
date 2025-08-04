@@ -83,8 +83,10 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
         initials: values.name.split(" ").map(n => n[0]).join(""),
       };
 
-      const studentDocRef = doc(db, "students", student.id);
-      await updateDoc(studentDocRef, studentData);
+      if (student.id) {
+        const studentDocRef = doc(db, "students", student.id);
+        await updateDoc(studentDocRef, studentData);
+      }
       
       onSave({...student, ...studentData});
       onOpenChange(false);
