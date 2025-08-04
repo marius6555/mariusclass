@@ -1,11 +1,13 @@
+
 'use client'
 
+import React, { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -14,11 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Briefcase } from "lucide-react";
 import Link from "next/link";
-
-const contacts = [
-  { name: "Dr. Alan Turing", role: "Professor", email: "alan.t@university.edu", avatar: "https://placehold.co/100x100.png", initials: "AT", hint: "man portrait" },
-  { name: "Ada Lovelace", role: "Teaching Assistant", email: "ada.l@university.edu", avatar: "https://placehold.co/100x100.png", initials: "AL", hint: "woman portrait" },
-];
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import type { Student } from "@/types";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -26,8 +26,30 @@ const formSchema = z.object({
   message: z.string().min(10, { message: "Message must be at least 10 characters." }).max(500),
 });
 
+const ADMIN_EMAIL = "tingiya730@gmail.com";
+
 export default function ContactPage() {
   const { toast } = useToast();
+  const [admin, setAdmin] = useState<Student | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAdmin = async () => {
+      try {
+        const q = query(collection(db, "students"), where("email", "==", ADMIN_EMAIL));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const adminDoc = querySnapshot.docs[0];
+          setAdmin({ id: adminDoc.id, ...adminDoc.data() } as Student);
+        }
+      } catch (error) {
+        console.error("Error fetching admin details:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAdmin();
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -43,7 +65,6 @@ export default function ContactPage() {
     toast({
       title: "Message Sent!",
       description: "Thanks for reaching out. We'll get back to you soon.",
-      className: "bg-accent text-accent-foreground border-green-300",
     });
     form.reset();
   }
@@ -51,36 +72,38 @@ export default function ContactPage() {
   return (
     <SidebarInset>
       <PageHeader
-        title="Contact & Join Us"
-        description="Get in touch with instructors or sign up for more information."
+        title="Contact Us"
+        description="Get in touch with the administrator."
       />
       <main className="p-6 lg:p-8 grid gap-12 md:grid-cols-2 items-start">
         <section>
-          <h2 className="font-headline text-2xl font-bold mb-4">Teaching Staff</h2>
-          <div className="space-y-4">
-            {contacts.map((contact) => (
-              <Card key={contact.name}>
-                <CardHeader className="flex flex-row items-center gap-4">
-                  <Avatar className="w-16 h-16">
-                    <AvatarImage src={contact.avatar} alt={contact.name} data-ai-hint={contact.hint} />
-                    <AvatarFallback>{contact.initials}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <CardTitle className="font-headline">{contact.name}</CardTitle>
-                    <div className="text-muted-foreground space-y-1 mt-1">
-                      <p className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> {contact.role}</p>
-                      <Link href={`mailto:${contact.email}`} className="flex items-center gap-2 hover:text-primary transition-colors">
-                        <Mail className="w-4 h-4"/> {contact.email}
-                      </Link>
-                    </div>
+          <h2 className="font-headline text-2xl font-bold mb-4">Contact Admin</h2>
+          {loading ? (
+             <p>Loading admin details...</p>
+          ) : admin ? (
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-4">
+                <Avatar className="w-16 h-16">
+                  <AvatarImage src={admin.avatar} alt={admin.name} data-ai-hint={admin.hint} />
+                  <AvatarFallback>{admin.initials}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle className="font-headline">{admin.name}</CardTitle>
+                  <div className="text-muted-foreground space-y-1 mt-1">
+                    <p className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Administrator</p>
+                    <Link href={`mailto:${admin.email}`} className="flex items-center gap-2 hover:text-primary transition-colors">
+                      <Mail className="w-4 h-4"/> {admin.email}
+                    </Link>
                   </div>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
+                </div>
+              </CardHeader>
+            </Card>
+          ) : (
+             <p>Admin details could not be loaded.</p>
+          )}
         </section>
         <section>
-          <h2 className="font-headline text-2xl font-bold mb-4">Join Us / Ask a Question</h2>
+          <h2 className="font-headline text-2xl font-bold mb-4">Send a Message</h2>
           <Card>
             <CardContent className="pt-6">
               <Form {...form}>
@@ -118,7 +141,7 @@ export default function ContactPage() {
                       <FormItem>
                         <FormLabel>Message</FormLabel>
                         <FormControl>
-                          <Textarea rows={5} placeholder="Tell us more about your interests or ask a question..." {...field} />
+                          <Textarea rows={5} placeholder="Ask a question or leave a comment..." {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
