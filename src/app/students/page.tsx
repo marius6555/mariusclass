@@ -72,13 +72,13 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
       }
 
       const studentData:Partial<Student> = {
-        name: student.name,
+        name: values.name,
         major: values.major,
         interests: values.interests.split(",").map(i => i.trim()),
         avatar: avatarUrl,
         bio: values.bio,
         hobbies: values.hobbies?.split(",").map(i => i.trim()) || [],
-        initials: student.name.split(" ").map(n => n[0]).join(""),
+        initials: values.name.split(" ").map(n => n[0]).join(""),
       };
 
       const studentDocRef = doc(db, "students", student.id);
@@ -97,7 +97,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
         <FormField control={form.control} name="name" render={({ field }) => (
           <FormItem>
             <FormLabel>Full Name</FormLabel>
-            <FormControl><Input placeholder="Alice Johnson" {...field} disabled /></FormControl>
+            <FormControl><Input placeholder="Alice Johnson" {...field} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -268,7 +268,7 @@ export default function StudentsPage() {
                   </div>
                 )}
             </CardContent>
-            <CardFooter className="justify-center gap-2">
+            <CardFooter className="justify-center">
                 <Button variant="outline" size="sm" onClick={() => handleEdit(student)} disabled={!currentUser || currentUser.uid !== student.uid}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit
