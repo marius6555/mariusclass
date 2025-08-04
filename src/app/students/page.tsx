@@ -72,12 +72,13 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
       }
 
       const studentData:Partial<Student> = {
-        name: values.name,
+        name: student.name,
         major: values.major,
         interests: values.interests.split(",").map(i => i.trim()),
         avatar: avatarUrl,
         bio: values.bio,
         hobbies: values.hobbies?.split(",").map(i => i.trim()) || [],
+        initials: student.name.split(" ").map(n => n[0]).join(""),
       };
 
       const studentDocRef = doc(db, "students", student.id);
