@@ -76,7 +76,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <FormField control={form.control} name="name" render={({ field }) => (
-          <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Ada Lovelace" {...field} disabled={!!student} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Ada Lovelace" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="major" render={({ field }) => (
           <FormItem><FormLabel>Major</FormLabel><FormControl><Input placeholder="Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
@@ -138,29 +138,37 @@ export default function StudentsPage() {
 
   const onSave = async (data: any, isNew: boolean) => {
     if (!currentUser?.uid) return;
-
+  
     let avatarUrl = editingStudent?.avatar || `https://placehold.co/100x100.png`;
+    
+    // If a new avatar file data is present, upload it.
     if (data.avatar) {
       const storageRef = ref(storage, `avatars/${currentUser.uid}`);
       await uploadString(storageRef, data.avatar, 'data_url');
       avatarUrl = await getDownloadURL(storageRef);
     }
-    
-    const studentData: Omit<Student, 'id'> = {
+  
+    const studentData: Omit<Student, 'id' | 'uid' | 'email'> & { uid: string; email: string; } = {
       uid: currentUser.uid,
       email: currentUser.email,
       name: data.name,
       major: data.major,
       interests: data.interests,
-      bio: data.bio,
-      hobbies: data.hobbies,
+      bio: data.bio || "",
+      hobbies: data.hobbies || [],
       avatar: avatarUrl,
       initials: data.name.split(" ").map((n:string) => n[0]).join(""),
       hint: 'person',
     };
-
+  
     try {
       if (isNew) {
+        const q = query(collection(db, "students"), where("uid", "==", currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            toast({ variant: "destructive", title: "Profile Exists", description: "A profile for this user already exists." });
+            return;
+        }
         const docRef = await addDoc(collection(db, "students"), studentData);
         const newStudent = { id: docRef.id, ...studentData };
         setCurrentUser(newStudent);
@@ -168,13 +176,13 @@ export default function StudentsPage() {
         toast({ title: "Profile Created!", description: "Your student profile is now live." });
       } else if (editingStudent?.id) {
         const studentRef = doc(db, "students", editingStudent.id);
-        await updateDoc(studentRef, { ...studentData, name: editingStudent.name }); // Name is not editable from form
-        const updatedStudent = { ...currentUser, ...studentData, id: editingStudent.id, name: editingStudent.name };
+        await updateDoc(studentRef, studentData);
+        const updatedStudent = { ...currentUser, ...studentData, id: editingStudent.id };
         setCurrentUser(updatedStudent);
         localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
         toast({ title: "Profile Updated!", description: "Your changes have been saved." });
       }
-      fetchStudents(); // Refresh the list
+      fetchStudents();
       setIsFormOpen(false);
       setEditingStudent(null);
     } catch (error: any) {
@@ -274,18 +282,22 @@ export default function StudentsPage() {
                     <h4 className="font-semibold text-sm mb-2">About Me</h4>
                     <p className="text-sm text-muted-foreground">{student.bio}</p>
                   </div>
-                  <div>
-                      <h4 className="font-semibold text-sm mb-2">Interests</h4>
-                      <div className="flex flex-wrap gap-2">
-                          {student.interests?.map(interest => <Badge key={interest} variant="secondary">{interest}</Badge>)}
-                      </div>
-                  </div>
-                   <div>
-                      <h4 className="font-semibold text-sm mb-2">Hobbies</h4>
-                      <div className="flex flex-wrap gap-2">
-                          {student.hobbies?.map(hobby => <Badge key={hobby} variant="outline">{hobby}</Badge>)}
-                      </div>
-                  </div>
+                  {student.interests && student.interests.length > 0 && (
+                    <div>
+                        <h4 className="font-semibold text-sm mb-2">Interests</h4>
+                        <div className="flex flex-wrap gap-2">
+                            {student.interests.map(interest => <Badge key={interest} variant="secondary">{interest}</Badge>)}
+                        </div>
+                    </div>
+                  )}
+                   {student.hobbies && student.hobbies.length > 0 && (
+                     <div>
+                        <h4 className="font-semibold text-sm mb-2">Hobbies</h4>
+                        <div className="flex flex-wrap gap-2">
+                            {student.hobbies.map(hobby => <Badge key={hobby} variant="outline">{hobby}</Badge>)}
+                        </div>
+                    </div>
+                   )}
               </CardContent>
               <CardFooter className="flex-col !items-start">
                  {student.email && <a href={`mailto:${student.email}`} className="text-sm text-muted-foreground hover:text-primary flex items-center gap-2 mb-4"><Mail className="w-4 h-4"/>{student.email}</a>}
@@ -330,3 +342,5 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
+
+    
