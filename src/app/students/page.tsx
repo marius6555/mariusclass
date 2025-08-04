@@ -36,6 +36,7 @@ export type Student = {
   initials: string;
   hint: string;
   email?: string;
+  uid?: string;
 };
 
 const defaultStudents: Omit<Student, 'id' | 'initials' | 'hint'>[] = [
@@ -184,18 +185,11 @@ export default function StudentsPage() {
       <main className="p-6 lg:p-8">
         <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">
-              {currentUser ? (
+              {currentUser && (
                   <div className="flex items-center gap-4">
                       <p>Welcome, <span className="font-bold">{currentUser.name}</span>!</p>
                       <Button variant="outline" size="sm" onClick={handleLogout}>Log Out</Button>
                   </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                    <p>Please sign up or log in to manage your profile.</p>
-                    <Link href="/auth">
-                        <Button>Sign Up / Login</Button>
-                    </Link>
-                </div>
               )}
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -227,7 +221,7 @@ export default function StudentsPage() {
                 </div>
             </CardContent>
             <CardFooter className="justify-center">
-                 <Button variant="outline" size="sm" onClick={() => handleEdit(student)} disabled={!currentUser || currentUser.id !== student.id}>
+                 <Button variant="outline" size="sm" onClick={() => handleEdit(student)} disabled={!currentUser || currentUser.uid !== student.uid}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit Profile
                 </Button>
