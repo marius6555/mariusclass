@@ -8,8 +8,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, PlusCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Pencil, PlusCircle, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,11 +18,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { db, storage, auth } from "@/lib/firebase";
-import { collection, getDocs, updateDoc, doc, addDoc, query, where } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, getDocs, updateDoc, doc, addDoc, query, where, deleteDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, deleteUser } from "firebase/auth";
+import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -148,9 +150,13 @@ function StudentForm({ student, onSave, onOpenChange }: { student?: Student | nu
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
+
 
   const fetchStudents = async () => {
     try {
@@ -161,7 +167,6 @@ export default function StudentsPage() {
         } as Student));
         setStudents(studentsList);
         
-        // After fetching students, update current user's full profile
         const storedUser = localStorage.getItem("currentUser");
         if (storedUser) {
           const user: Student = JSON.parse(storedUser);
@@ -179,24 +184,25 @@ export default function StudentsPage() {
   };
 
   useEffect(() => {
-    fetchStudents();
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
-            const storedUser = localStorage.getItem("currentUser");
-            if(storedUser) {
-                const studentData = JSON.parse(storedUser);
-                if(studentData.uid !== user.uid) { // User has changed
-                    localStorage.removeItem("currentUser");
-                    fetchStudents(); // Re-fetch students and profiles
-                } else {
-                   setCurrentUser(studentData);
-                }
-            }
-        } else {
+      if (user) {
+        const storedUser = localStorage.getItem("currentUser");
+        if (storedUser) {
+          const studentData = JSON.parse(storedUser);
+          if (studentData.uid === user.uid) {
+            setCurrentUser(studentData);
+          } else { // Different user logged in
             localStorage.removeItem("currentUser");
-            setCurrentUser(null);
+            // We'll fetch their full profile below
+          }
         }
+        // Always fetch fresh student data on auth change
+        fetchStudents();
+      } else {
+        localStorage.removeItem("currentUser");
+        setCurrentUser(null);
+        setStudents([]); // Clear students on logout
+      }
     });
 
     return () => unsubscribe();
@@ -207,11 +213,57 @@ export default function StudentsPage() {
     setIsDialogOpen(true);
   }
 
+  const handleDelete = (student: Student) => {
+    setDeletingStudent(student);
+    setIsAlertOpen(true);
+  };
+  
+  const confirmDelete = async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || !deletingStudent || firebaseUser.uid !== deletingStudent.uid) {
+        toast({ variant: "destructive", title: "Error", description: "You can only delete your own profile." });
+        return;
+    }
+
+    try {
+        // 1. Delete avatar from Storage
+        if (deletingStudent.avatar && !deletingStudent.avatar.includes('placehold.co')) {
+            const avatarRef = ref(storage, deletingStudent.avatar);
+            await deleteObject(avatarRef).catch(err => console.warn("Could not delete avatar, it might not exist.", err));
+        }
+
+        // 2. Delete student doc from Firestore
+        await deleteDoc(doc(db, "students", deletingStudent.id));
+
+        // 3. Delete user from Auth
+        await deleteUser(firebaseUser);
+
+        // 4. Cleanup UI
+        toast({ title: "Profile Deleted", description: "Your profile has been permanently deleted." });
+        localStorage.removeItem("currentUser");
+        setCurrentUser(null);
+        setStudents(prev => prev.filter(s => s.id !== deletingStudent.id));
+        router.push('/auth');
+        
+    } catch (error: any) {
+        console.error("Error deleting profile:", error);
+        toast({ variant: "destructive", title: "Deletion Failed", description: error.message });
+        if(error.code === 'auth/requires-recent-login'){
+            toast({ variant: "destructive", title: "Please Login Again", description: "For security, you need to log in again to delete your account." });
+            router.push('/auth');
+        }
+    } finally {
+        setIsAlertOpen(false);
+        setDeletingStudent(null);
+    }
+  };
+
+
   const handleAddProfile = () => {
     const firebaseUser = auth.currentUser;
-    if (firebaseUser) {
+    if (firebaseUser && !userHasProfile) {
       setEditingStudent({
-        id: '', // Will be set on save
+        id: '', 
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         name: firebaseUser.displayName || '',
@@ -231,18 +283,17 @@ export default function StudentsPage() {
     const firebaseUser = auth.currentUser;
     if(!firebaseUser) return;
 
-    // Check if it's a new profile
     if(!updatedStudent.id) { 
-        const { id, ...newStudentData} = updatedStudent; // remove id before saving
+        const { id, ...newStudentData} = updatedStudent; 
         const studentData = {
           ...newStudentData,
           uid: firebaseUser.uid,
-          email: firebaseUser.email,
+          email: firebaseUser.email?.toLowerCase(),
         };
         const docRef = await addDoc(collection(db, "students"), studentData);
         toast({ title: "Profile Created!", description: "Your profile has been created." });
 
-    } else { // It's an existing profile update
+    } else { 
         if(currentUser && currentUser.id === updatedStudent.id) {
             const updatedUser = { ...currentUser, ...updatedStudent } as Student;
             setCurrentUser(updatedUser);
@@ -281,7 +332,8 @@ export default function StudentsPage() {
             )
           }
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        
+        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => { setIsDialogOpen(isOpen); if(!isOpen) setEditingStudent(null); }}>
             <DialogContent>
             <DialogHeader>
                 <DialogTitle>{editingStudent?.id ? 'Edit Profile' : 'Create Your Profile'}</DialogTitle>
@@ -289,6 +341,22 @@ export default function StudentsPage() {
             <StudentForm student={editingStudent} onSave={onSave} onOpenChange={setIsDialogOpen} />
             </DialogContent>
         </Dialog>
+
+        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your account, profile, and all associated data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeletingStudent(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {students.map((student) => (
             <Card key={student.id} className="flex flex-col text-center hover:shadow-lg transition-shadow">
@@ -326,10 +394,14 @@ export default function StudentsPage() {
                 )}
             </CardContent>
             {currentUser && currentUser.uid === student.uid && (
-              <CardFooter className="justify-center">
+              <CardFooter className="justify-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(student)}>
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit
+                  </Button>
+                   <Button variant="destructive" size="sm" onClick={() => handleDelete(student)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
                   </Button>
               </CardFooter>
             )}
@@ -340,5 +412,3 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
-
-    
