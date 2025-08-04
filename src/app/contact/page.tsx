@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, Briefcase } from "lucide-react";
 import Link from "next/link";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import type { Student } from "@/types";
 
 const formSchema = z.object({
@@ -60,13 +60,26 @@ export default function ContactPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-    toast({
-      title: "Message Sent!",
-      description: "Thanks for reaching out. We'll get back to you soon.",
-    });
-    form.reset();
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await addDoc(collection(db, "messages"), {
+        ...values,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+      toast({
+        title: "Message Sent!",
+        description: "Thanks for reaching out. We'll get back to you soon.",
+      });
+      form.reset();
+    } catch (error) {
+       console.error("Error sending message:", error);
+       toast({
+        variant: "destructive",
+        title: "Sending Failed",
+        description: "There was a problem sending your message. Please try again.",
+      });
+    }
   }
 
   return (

@@ -19,9 +19,13 @@ import {
   GraduationCap,
   LogIn,
   Users,
+  Shield,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import React, { useState, useEffect } from 'react';
+import type { Student } from '@/types';
+
 
 const links = [
   { href: "/", label: "Home", icon: Home },
@@ -30,11 +34,36 @@ const links = [
   { href: "/events", label: "Events/Updates", icon: CalendarClock },
   { href: "/resources", label: "Resources", icon: BookCopy },
   { href: "/contact", label: "Contact/Join Us", icon: Mail },
-  { href: "/auth", label: "Login/Sign Up", icon: LogIn },
-]
+];
+
+const adminLink = { href: "/admin", label: "Admin", icon: Shield };
+const authLink = { href: "/auth", label: "Login/Sign Up", icon: LogIn };
+
+const ADMIN_EMAIL = "tingiya730@gmail.com";
 
 export function AppSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState<Student | null>(null);
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        setCurrentUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error("Failed to parse from localStorage", error);
+    }
+  }, []);
+  
+  const isAdmin = currentUser?.email === ADMIN_EMAIL;
+  
+  const navLinks = [...links];
+  if(isAdmin) {
+    navLinks.push(adminLink);
+  }
+  navLinks.push(authLink);
+
 
   return (
     <Sidebar>
@@ -48,7 +77,7 @@ export function AppSidebar() {
           </div>
         </SidebarHeader>
         <SidebarMenu>
-          {links.map((link) => (
+          {navLinks.map((link) => (
             <SidebarMenuItem key={link.href}>
               <Link href={link.href}>
                 <SidebarMenuButton
