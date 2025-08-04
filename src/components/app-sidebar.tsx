@@ -27,8 +27,9 @@ import React, { useState, useEffect } from 'react';
 import type { Student } from '@/types';
 
 
-const links = [
+const baseLinks = [
   { href: "/", label: "Home", icon: Home },
+  { href: "/auth", label: "Login/Sign Up", icon: LogIn },
   { href: "/students", label: "Student Profiles", icon: Users },
   { href: "/projects", label: "Project Hub", icon: FolderKanban },
   { href: "/events", label: "Events/Updates", icon: CalendarClock },
@@ -37,7 +38,6 @@ const links = [
 ];
 
 const adminLink = { href: "/admin", label: "Admin", icon: Shield };
-const authLink = { href: "/auth", label: "Login/Sign Up", icon: LogIn };
 
 const ADMIN_EMAIL = "tingiya730@gmail.com";
 
@@ -58,11 +58,16 @@ export function AppSidebar() {
   
   const isAdmin = currentUser?.email === ADMIN_EMAIL;
   
-  const navLinks = [...links];
+  const navLinks = [...baseLinks];
   if(isAdmin) {
-    navLinks.push(adminLink);
+    // Insert admin link after "Contact/Join Us"
+    const contactIndex = navLinks.findIndex(link => link.href === '/contact');
+    if (contactIndex !== -1) {
+        navLinks.splice(contactIndex + 1, 0, adminLink);
+    } else {
+        navLinks.push(adminLink); // fallback
+    }
   }
-  navLinks.push(authLink);
 
 
   return (
