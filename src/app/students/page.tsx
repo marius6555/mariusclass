@@ -8,19 +8,22 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Pencil, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { db, storage } from "@/lib/firebase";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage, auth } from "@/lib/firebase";
+import { collection, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
-import Link from "next/link";
+import { deleteUser } from "firebase/auth";
+import { useRouter } from "next/navigation";
+
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -151,6 +154,7 @@ export default function StudentsPage() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   const fetchStudents = async () => {
     try {
@@ -192,6 +196,36 @@ export default function StudentsPage() {
     setEditingStudent(student);
     setIsDialogOpen(true);
   }
+
+  const handleDelete = async (studentToDelete: Student) => {
+    const user = auth.currentUser;
+    if (!user || user.uid !== studentToDelete.uid) {
+        toast({ variant: "destructive", title: "Unauthorized", description: "You can only delete your own profile." });
+        return;
+    }
+    
+    try {
+        // Delete from Firestore
+        await deleteDoc(doc(db, "students", studentToDelete.id));
+
+        // Delete avatar from Storage
+        if (studentToDelete.avatar && studentToDelete.avatar.includes('firebasestorage')) {
+            const avatarRef = ref(storage, studentToDelete.avatar);
+            await deleteObject(avatarRef);
+        }
+
+        // Delete from Auth
+        await deleteUser(user);
+
+        toast({ title: "Profile Deleted", description: "Your profile has been successfully deleted." });
+        handleLogout();
+        router.push("/");
+
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Deletion Failed", description: error.message });
+        console.error("Error deleting profile:", error);
+    }
+  };
   
   const onSave = (updatedStudent: Partial<Student>) => {
     const updatedUser = { ...currentUser, ...updatedStudent } as Student;
@@ -266,11 +300,34 @@ export default function StudentsPage() {
                   </div>
                 )}
             </CardContent>
-            <CardFooter className="justify-center">
+            <CardFooter className="justify-center gap-2">
                  <Button variant="outline" size="sm" onClick={() => handleEdit(student)} disabled={!currentUser || currentUser.uid !== student.uid}>
                     <Pencil className="mr-2 h-4 w-4" />
-                    Edit Profile
+                    Edit
                 </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={!currentUser || currentUser.uid !== student.uid}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your account
+                        and remove your data from our servers.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(student)}>
+                        Continue
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
             </CardFooter>
             </Card>
         ))}
@@ -279,3 +336,4 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
+
