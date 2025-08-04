@@ -20,11 +20,12 @@ import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storag
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Briefcase, PlusCircle, Trash2, Edit, Camera, Eye } from 'lucide-react';
+import { Mail, Briefcase, PlusCircle, Trash2, Edit, Camera, Eye, ExternalLink } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
+import Link from 'next/link';
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -34,6 +35,13 @@ const formSchema = z.object({
   hobbies: z.string().min(2, "Please list at least one hobby.").optional(),
   avatar: z.any().optional(),
 });
+
+type Project = {
+  id: string;
+  title: string;
+  link: string;
+  author: string;
+};
 
 function StudentForm({ student, onSave, onOpenChange }: { student: Student | null, onSave: (data: any) => void, onOpenChange: (open: boolean) => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -123,6 +131,7 @@ export default function StudentsPage() {
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [studentProjects, setStudentProjects] = useState<Project[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [password, setPassword] = useState('');
   const { toast } = useToast();
@@ -174,6 +183,7 @@ export default function StudentsPage() {
       initials: data.name.split(" ").map((n:string) => n[0]).join(""),
       hint: 'person',
     };
+    delete studentData.avatar;
     delete studentData.id;
   
     try {
@@ -185,7 +195,7 @@ export default function StudentsPage() {
       } else if(studentToUpdate?.id) {
         const studentRef = doc(db, "students", studentToUpdate.id);
         await updateDoc(studentRef, studentData);
-        updatedStudent = { ...studentToUpdate, ...studentData, id: studentToUpdate.id };
+        updatedStudent = { ...studentToUpdate, ...studentData };
         toast({ title: "Profile Updated!", description: "Your changes have been saved." });
       } else {
         throw new Error("Could not find student profile to update.");
@@ -242,7 +252,6 @@ export default function StudentsPage() {
     }
   };
 
-
   const openFormForNew = () => {
     setEditingStudent(null);
     setIsFormOpen(true);
@@ -251,6 +260,19 @@ export default function StudentsPage() {
   const openFormForEdit = (student: Student) => {
     setEditingStudent(student);
     setIsFormOpen(true);
+  };
+
+  const handleViewProfile = async (student: Student) => {
+    setViewingStudent(student);
+    try {
+      const q = query(collection(db, "projects"), where("author", "==", student.name));
+      const querySnapshot = await getDocs(q);
+      const projectsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      setStudentProjects(projectsList);
+    } catch (error) {
+      console.error("Error fetching student projects:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch student projects." });
+    }
   };
   
   const userHasProfile = useMemo(() => students.some(s => s.uid === currentUser?.uid), [students, currentUser]);
@@ -323,6 +345,20 @@ export default function StudentsPage() {
                                     </div>
                                 </div>
                                 )}
+                                {studentProjects && studentProjects.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-lg mb-2 border-b pb-1">Projects</h4>
+                                    <ul className="space-y-2">
+                                    {studentProjects.map(project => (
+                                        <li key={project.id}>
+                                            <Link href={project.link} target="_blank" className="text-primary hover:underline flex items-center gap-2">
+                                                 {project.title} <ExternalLink className="w-4 h-4"/>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                    </ul>
+                                </div>
+                                )}
                             </div>
                         </div>
                     </>
@@ -352,7 +388,7 @@ export default function StudentsPage() {
                   </div>
               </CardContent>
               <CardFooter className="flex-col !items-stretch gap-2 pt-4 border-t">
-                 <Button variant="outline" size="sm" onClick={() => setViewingStudent(student)}>
+                 <Button variant="outline" size="sm" onClick={() => handleViewProfile(student)}>
                     <Eye className="mr-2 h-4 w-4"/> View Profile
                  </Button>
                  {currentUser?.uid === student.uid && (
@@ -396,5 +432,3 @@ export default function StudentsPage() {
     </SidebarInset>
   );
 }
-
-    
