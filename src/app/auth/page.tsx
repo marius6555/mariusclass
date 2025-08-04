@@ -51,7 +51,7 @@ export default function AuthPage() {
 
       const studentData = {
         uid: user.uid,
-        email: values.email,
+        email: values.email.toLowerCase(),
         name: values.name,
         major: "",
         interests: [],
@@ -80,7 +80,7 @@ export default function AuthPage() {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
 
-      const q = query(collection(db, "students"), where("email", "==", values.email));
+      const q = query(collection(db, "students"), where("email", "==", values.email.toLowerCase()));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
