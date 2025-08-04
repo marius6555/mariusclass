@@ -20,10 +20,11 @@ import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storag
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Briefcase, PlusCircle, Trash2, Edit, Camera } from 'lucide-react';
+import { Mail, Briefcase, PlusCircle, Trash2, Edit, Camera, Eye } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { Separator } from '@/components/ui/separator';
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -121,6 +122,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [password, setPassword] = useState('');
   const { toast } = useToast();
@@ -183,7 +185,7 @@ export default function StudentsPage() {
       } else if(studentToUpdate?.id) {
         const studentRef = doc(db, "students", studentToUpdate.id);
         await updateDoc(studentRef, studentData);
-        updatedStudent = { ...studentToUpdate, ...studentData };
+        updatedStudent = { ...studentToUpdate, ...studentData, id: studentToUpdate.id };
         toast({ title: "Profile Updated!", description: "Your changes have been saved." });
       } else {
         throw new Error("Could not find student profile to update.");
@@ -192,7 +194,7 @@ export default function StudentsPage() {
       setCurrentUser(updatedStudent);
       localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
       
-      await fetchStudents(); // Refetch all students to update the list
+      await fetchStudents(); 
       setIsFormOpen(false);
       setEditingStudent(null);
     } catch (error: any) {
@@ -276,6 +278,58 @@ export default function StudentsPage() {
                 <StudentForm student={editingStudent} onSave={onSave} onOpenChange={setIsFormOpen}/>
             </DialogContent>
         </Dialog>
+        
+        <Dialog open={!!viewingStudent} onOpenChange={(open) => !open && setViewingStudent(null)}>
+            <DialogContent className="max-w-2xl">
+                {viewingStudent && (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="text-center text-2xl font-headline mb-4">{viewingStudent.name}'s Profile</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+                             <div className="flex-shrink-0 text-center">
+                                <Avatar className="w-32 h-32 mb-4 mx-auto">
+                                    <AvatarImage src={viewingStudent.avatar} alt={viewingStudent.name} />
+                                    <AvatarFallback>{viewingStudent.initials}</AvatarFallback>
+                                </Avatar>
+                                <h3 className="font-bold text-lg">{viewingStudent.name}</h3>
+                                <p className="text-muted-foreground">{viewingStudent.major}</p>
+                                {viewingStudent.email && (
+                                     <a href={`mailto:${viewingStudent.email}`} className="text-sm text-primary hover:underline flex items-center justify-center gap-2 mt-2">
+                                        <Mail className="w-4 h-4"/>{viewingStudent.email}
+                                    </a>
+                                )}
+                            </div>
+                             <div className="w-full space-y-6">
+                                {viewingStudent.bio && (
+                                <div>
+                                    <h4 className="font-semibold text-lg mb-2 border-b pb-1">About Me</h4>
+                                    <p className="text-muted-foreground">{viewingStudent.bio}</p>
+                                </div>
+                                )}
+                                {viewingStudent.interests && viewingStudent.interests.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-lg mb-2 border-b pb-1">Interests</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {viewingStudent.interests.map(interest => <Badge key={interest} variant="secondary">{interest}</Badge>)}
+                                    </div>
+                                </div>
+                                )}
+                                {viewingStudent.hobbies && viewingStudent.hobbies.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-lg mb-2 border-b pb-1">Hobbies</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {viewingStudent.hobbies.map(hobby => <Badge key={hobby} variant="outline">{hobby}</Badge>)}
+                                    </div>
+                                </div>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {students.map((student) => (
@@ -290,30 +344,19 @@ export default function StudentsPage() {
               </CardHeader>
               <CardContent className="flex-grow space-y-4">
                   <div>
-                    <h4 className="font-semibold text-sm mb-2">About Me</h4>
-                    <p className="text-sm text-muted-foreground">{student.bio}</p>
+                    <h4 className="font-semibold text-sm mb-2">Interests</h4>
+                    <div className="flex flex-wrap gap-2">
+                        {student.interests.slice(0, 3).map(interest => <Badge key={interest} variant="secondary">{interest}</Badge>)}
+                        {student.interests.length > 3 && <Badge variant="outline">+{student.interests.length - 3}</Badge>}
+                    </div>
                   </div>
-                  {student.interests && student.interests.length > 0 && (
-                    <div>
-                        <h4 className="font-semibold text-sm mb-2">Interests</h4>
-                        <div className="flex flex-wrap gap-2">
-                            {student.interests.map(interest => <Badge key={interest} variant="secondary">{interest}</Badge>)}
-                        </div>
-                    </div>
-                  )}
-                   {student.hobbies && student.hobbies.length > 0 && (
-                     <div>
-                        <h4 className="font-semibold text-sm mb-2">Hobbies</h4>
-                        <div className="flex flex-wrap gap-2">
-                            {student.hobbies.map(hobby => <Badge key={hobby} variant="outline">{hobby}</Badge>)}
-                        </div>
-                    </div>
-                   )}
               </CardContent>
-              <CardFooter className="flex-col !items-start">
-                 {student.email && <a href={`mailto:${student.email}`} className="text-sm text-muted-foreground hover:text-primary flex items-center gap-2 mb-4"><Mail className="w-4 h-4"/>{student.email}</a>}
+              <CardFooter className="flex-col !items-stretch gap-2 pt-4 border-t">
+                 <Button variant="outline" size="sm" onClick={() => setViewingStudent(student)}>
+                    <Eye className="mr-2 h-4 w-4"/> View Profile
+                 </Button>
                  {currentUser?.uid === student.uid && (
-                  <div className="flex w-full gap-2 mt-auto pt-4 border-t">
+                  <div className="flex w-full gap-2">
                       <Button variant="outline" size="sm" onClick={() => openFormForEdit(student)} className="flex-1">
                           <Edit className="mr-2 h-4 w-4"/> Edit
                       </Button>
