@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import React, { useState, useEffect } from "react";
@@ -22,6 +21,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -40,10 +40,10 @@ export type Student = {
   hint: string;
 };
 
-const defaultStudents: Omit<Student, 'id'>[] = [
-    { name: "Alice Johnson", major: "Computer Science", interests: ["AI", "Web Dev", "UX Design"], avatar: "https://placehold.co/100x100.png", initials: "AJ", hint: "woman face" },
-    { name: "Bob Williams", major: "Data Science", interests: ["Machine Learning", "Statistics"], avatar: "https://placehold.co/100x100.png", initials: "BW", hint: "man portrait" },
-    { name: "Charlie Brown", major: "Software Engineering", interests: ["Mobile Apps", "Game Dev"], avatar: "https://placehold.co/100x100.png", initials: "CB", hint: "person smiling" },
+const defaultStudents: Omit<Student, 'id' | 'initials' | 'hint'>[] = [
+    { name: "Alice Johnson", major: "Computer Science", interests: ["AI", "Web Dev", "UX Design"], avatar: "https://placehold.co/100x100.png" },
+    { name: "Bob Williams", major: "Data Science", interests: ["Machine Learning", "Statistics"], avatar: "https://placehold.co/100x100.png" },
+    { name: "Charlie Brown", major: "Software Engineering", interests: ["Mobile Apps", "Game Dev"], avatar: "https://placehold.co/100x100.png" },
 ];
 
 function StudentForm({ student, onSave, onOpenChange }: { student?: Student | null, onSave: () => void, onOpenChange: (open:boolean) => void }) {
@@ -128,6 +128,7 @@ export default function StudentsPage() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const { toast } = useToast();
 
   const fetchStudents = async () => {
     try {
@@ -135,7 +136,12 @@ export default function StudentsPage() {
         if (querySnapshot.empty) {
             // If no students in firestore, add the default ones
             for (const stud of defaultStudents) {
-                await addDoc(collection(db, "students"), stud);
+                const studentData = {
+                    ...stud,
+                    initials: stud.name.split(" ").map(n => n[0]).join(""),
+                    hint: 'person',
+                };
+                await addDoc(collection(db, "students"), studentData);
             }
             fetchStudents(); // re-fetch to display
         } else {
@@ -189,6 +195,21 @@ export default function StudentsPage() {
     fetchStudents();
     setIsDialogOpen(false);
     setEditingStudent(null);
+    toast({
+        title: "Profile Saved!",
+        description: "Your profile has been successfully saved.",
+    });
+    // If the current user was the one being edited, update their info in localStorage
+    if (currentUser && editingStudent && currentUser.id === editingStudent.id) {
+        fetchStudents().then(() => {
+            // we need to get the updated student from the new list
+            const updatedUser = students.find(s => s.id === currentUser.id);
+            if (updatedUser) {
+                setCurrentUser(updatedUser);
+                localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+            }
+        });
+    }
   }
 
   return (
