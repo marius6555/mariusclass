@@ -20,7 +20,6 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
-import { ResourcesChatbot } from "@/components/resources-chatbot";
 
 const formSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
@@ -209,7 +208,6 @@ export default function ResourcesPage() {
             </div>
         )}
       </main>
-      <ResourcesChatbot />
     </SidebarInset>
   );
 }
