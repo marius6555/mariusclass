@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { SidebarInset } from "@/components/ui/sidebar";
-import { PageHeader } from "@/components/page-header";
 import Image from "next/image";
 import { GraduationCap } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -33,12 +32,8 @@ export default function Home() {
 
   return (
     <SidebarInset>
-      <PageHeader
-        title="Welcome to ClassHub Central"
-        description="Your central hub for class activities, resources, and collaboration."
-      />
       <main className="flex-1">
-        <div className="relative flex flex-col justify-center items-center text-center p-8 min-h-[calc(100vh-4.5rem)]">
+        <div className="relative flex flex-col justify-center items-center text-center p-8 min-h-screen">
             <div className="absolute inset-0 z-0">
                 {!loading && (
                     <Image 
@@ -65,5 +60,3 @@ export default function Home() {
     </SidebarInset>
   );
 }
-
-    
