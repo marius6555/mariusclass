@@ -8,6 +8,7 @@ import { GraduationCap } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { PageHeader } from '@/components/page-header';
+import { Chatbot } from '@/components/chatbot';
 
 export default function Home() {
   const [backgroundUrl, setBackgroundUrl] = useState('https://placehold.co/1200x800.png');
@@ -62,6 +63,7 @@ export default function Home() {
                 </div>
             </div>
         </main>
+        <Chatbot />
     </SidebarInset>
   );
 }
