@@ -72,16 +72,9 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project?: Proj
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      // Validate if the image URL is a valid URL, otherwise use a placeholder.
-      let imageUrl = "https://placehold.co/600x400.png";
-      try {
-        if (values.image) {
-          new URL(values.image);
-          imageUrl = values.image;
-        }
-      } catch (e) {
-        // Keep placeholder if URL is invalid
-        console.warn("Invalid image URL provided, using placeholder.");
+      let imageUrl = values.image;
+      if (!imageUrl || !/^(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp|svg)).*$/.test(imageUrl)) {
+        imageUrl = "https://placehold.co/600x400.png";
       }
 
       const projectData = {
@@ -271,3 +264,5 @@ export default function ProjectsPage() {
     </SidebarInset>
   );
 }
+
+    
