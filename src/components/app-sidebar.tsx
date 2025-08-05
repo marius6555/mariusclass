@@ -25,6 +25,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import React, { useState, useEffect } from 'react';
 import type { Student } from '@/types';
+import { ThemeToggle } from "./theme-toggle"
 
 
 const baseLinks = [
@@ -97,7 +98,9 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter />
+      <SidebarFooter>
+        <ThemeToggle />
+      </SidebarFooter>
     </Sidebar>
   )
 }
