@@ -72,12 +72,24 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project?: Proj
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      // Validate if the image URL is a valid URL, otherwise use a placeholder.
+      let imageUrl = "https://placehold.co/600x400.png";
+      try {
+        if (values.image) {
+          new URL(values.image);
+          imageUrl = values.image;
+        }
+      } catch (e) {
+        // Keep placeholder if URL is invalid
+        console.warn("Invalid image URL provided, using placeholder.");
+      }
+
       const projectData = {
         title: values.title,
         category: values.category,
         description: values.description,
         link: values.link,
-        image: values.image || "https://placehold.co/600x400.png",
+        image: imageUrl,
         tags: values.tags.split(",").map(t => t.trim()),
         hint: 'abstract',
         author: project?.author || author,
@@ -105,7 +117,7 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project?: Proj
           <FormItem><FormLabel>Project URL</FormLabel><FormControl><Input placeholder="https://github.com/user/project" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="image" render={({ field }) => (
-          <FormItem><FormLabel>Image URL</FormLabel><FormControl><Input placeholder="https://placehold.co/600x400.png" {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/600x400.png" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="tags" render={({ field }) => (
           <FormItem><FormLabel>Tags (comma-separated)</FormLabel><FormControl><Input placeholder="Python, NLTK, Flask" {...field} /></FormControl><FormMessage /></FormItem>
@@ -224,7 +236,7 @@ export default function ProjectsPage() {
                   .map((project) => (
                     <Card key={project.id} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
                       <div className="aspect-video relative">
-                        <Image src={project.image} alt={project.title} fill className="object-cover" data-ai-hint={project.hint} />
+                        <Image src={project.image || 'https://placehold.co/600x400.png'} alt={project.title} fill className="object-cover" data-ai-hint={project.hint} />
                       </div>
                       <CardHeader>
                         <CardTitle className="font-headline">{project.title}</CardTitle>
