@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, PlusCircle, Edit } from "lucide-react";
+import { ExternalLink, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -19,7 +19,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, doc, updateDoc, query } from "firebase/firestore";
+import { collection, getDocs, addDoc, query } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
 
@@ -46,29 +46,18 @@ type Project = {
 
 const categories = ["All", "AI", "Web Dev", "Mobile", "Data Science", "Cybersecurity"];
 
-function ProjectForm({ project, onSave, onOpenChange, author }: { project?: Project | null, onSave: (data: any, projectId?: string) => void, onOpenChange: (open: boolean) => void, author: string }) {
+function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => void, onOpenChange: (open: boolean) => void, author: string }) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: project?.title || "",
-      category: project?.category || "",
-      description: project?.description || "",
-      link: project?.link || "",
-      image: project?.image || "",
-      tags: project?.tags?.join(", ") || "",
+      title: "",
+      category: "",
+      description: "",
+      link: "",
+      image: "",
+      tags: "",
     },
   });
-
-  useEffect(() => {
-    form.reset({
-      title: project?.title || "",
-      category: project?.category || "",
-      description: project?.description || "",
-      link: project?.link || "",
-      image: project?.image || "",
-      tags: project?.tags?.join(", ") || "",
-    });
-  }, [project, form]);
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -85,9 +74,9 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project?: Proj
         image: imageUrl,
         tags: values.tags.split(",").map(t => t.trim()),
         hint: 'abstract',
-        author: project?.author || author,
+        author: author,
       };
-      onSave(projectData, project?.id);
+      onSave(projectData);
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving project: ", error);
@@ -115,7 +104,7 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project?: Proj
         <FormField control={form.control} name="tags" render={({ field }) => (
           <FormItem><FormLabel>Tags (comma-separated)</FormLabel><FormControl><Input placeholder="Python, NLTK, Flask" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
-        <Button type="submit" className="w-full">{project ? "Save Changes" : "Add Project"}</Button>
+        <Button type="submit" className="w-full">Add Project</Button>
       </form>
     </Form>
   );
@@ -124,7 +113,6 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project?: Proj
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
 
@@ -150,19 +138,12 @@ export default function ProjectsPage() {
     }
   }, []);
 
-  const onSave = async (data: any, projectId?: string) => {
+  const onSave = async (data: any) => {
     try {
-      if (projectId) {
-        const projectRef = doc(db, "projects", projectId);
-        await updateDoc(projectRef, data);
-        toast({ title: "Project Updated!", description: "Your project has been successfully updated." });
-      } else {
-        await addDoc(collection(db, "projects"), data);
-        toast({ title: "Project Added!", description: "Your project has been added to the hub." });
-      }
+      await addDoc(collection(db, "projects"), data);
+      toast({ title: "Project Added!", description: "Your project has been added to the hub." });
       fetchProjects();
       setIsDialogOpen(false);
-      setEditingProject(null);
     } catch (error) {
       console.error("Error saving project:", error);
       toast({ variant: "destructive", title: "Save failed", description: "There was an issue saving your project."});
@@ -170,12 +151,6 @@ export default function ProjectsPage() {
   };
   
   const handleAddClick = () => {
-      setEditingProject(null);
-      setIsDialogOpen(true);
-  };
-  
-  const handleEditClick = (project: Project) => {
-      setEditingProject(project);
       setIsDialogOpen(true);
   };
 
@@ -187,7 +162,7 @@ export default function ProjectsPage() {
       />
       <main className="p-6 lg:p-8">
         <div className="flex justify-end mb-6">
-            <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingProject(null); }}>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                  <Button onClick={handleAddClick} disabled={!currentUser}>
                     <PlusCircle className="mr-2"/> Add Project
@@ -195,11 +170,10 @@ export default function ProjectsPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingProject ? "Edit Your Project" : "Add Your Project"}</DialogTitle>
+                  <DialogTitle>Add Your Project</DialogTitle>
                 </DialogHeader>
                 {currentUser ? (
                     <ProjectForm 
-                        project={editingProject} 
                         onSave={onSave} 
                         onOpenChange={setIsDialogOpen} 
                         author={currentUser.name} 
@@ -247,12 +221,6 @@ export default function ProjectsPage() {
                             View Project <ExternalLink className="ml-2 h-4 w-4" />
                           </Button>
                         </Link>
-                        {currentUser?.name === project.author && (
-                            <Button variant="outline" size="icon" onClick={() => handleEditClick(project)}>
-                                <Edit className="h-4 w-4"/>
-                                <span className="sr-only">Edit Project</span>
-                            </Button>
-                        )}
                       </CardFooter>
                     </Card>
                   ))}
@@ -264,5 +232,4 @@ export default function ProjectsPage() {
     </SidebarInset>
   );
 }
-
     
