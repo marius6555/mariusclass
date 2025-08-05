@@ -46,6 +46,10 @@ type Project = {
 
 const categories = ["All", "AI", "Web Dev", "Mobile", "Data Science", "Cybersecurity"];
 
+const isValidImageUrl = (url: string) => {
+    return url.match(/\.(jpeg|jpg|gif|png|svg|webp)$/) !== null;
+}
+
 function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => void, onOpenChange: (open: boolean) => void, author: string }) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -62,7 +66,7 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       let imageUrl = values.image;
-      if (!imageUrl || !/^(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp|svg)).*$/.test(imageUrl)) {
+      if (!imageUrl || !isValidImageUrl(imageUrl)) {
         imageUrl = "https://placehold.co/600x400.png";
       }
 
@@ -203,7 +207,13 @@ export default function ProjectsPage() {
                   .map((project) => (
                     <Card key={project.id} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
                       <div className="aspect-video relative">
-                        <Image src={project.image || 'https://placehold.co/600x400.png'} alt={project.title} fill className="object-cover" data-ai-hint={project.hint} />
+                        <Image 
+                          src={isValidImageUrl(project.image) ? project.image : 'https://placehold.co/600x400.png'} 
+                          alt={project.title} 
+                          fill 
+                          className="object-cover" 
+                          data-ai-hint={project.hint} 
+                        />
                       </div>
                       <CardHeader>
                         <CardTitle className="font-headline">{project.title}</CardTitle>
