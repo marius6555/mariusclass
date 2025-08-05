@@ -186,9 +186,9 @@ export default function ResourcesPage() {
                       {items.map((item) => (
                         <li key={item.id} className="flex items-center justify-between p-4 rounded-lg border bg-background">
                           <span className="font-medium">{item.title}</span>
-                          <Link href={item.href} passHref legacyBehavior>
-                             <Button variant="ghost" size="icon" asChild>
-                                <a target="_blank">
+                          <Link href={item.href} target="_blank" passHref>
+                            <Button variant="ghost" size="icon" asChild>
+                                <a>
                                   {item.type === 'file' ? <Download /> : <LinkIcon />}
                                   <span className="sr-only">{item.type === 'file' ? 'Download' : 'Open link'}</span>
                                 </a>
