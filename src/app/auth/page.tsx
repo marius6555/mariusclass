@@ -95,7 +95,13 @@ export default function AuthPage() {
       router.push('/');
 
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Login Failed", description: error.message });
+      let errorMessage = "An unknown error occurred. Please try again.";
+      if (error.code === 'auth/invalid-credential') {
+        errorMessage = "Invalid email or password. Please try again.";
+      } else {
+        errorMessage = error.message;
+      }
+      toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
       console.error("Login error:", error);
     }
   };
