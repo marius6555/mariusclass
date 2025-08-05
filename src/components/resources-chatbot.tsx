@@ -38,7 +38,7 @@ export function ResourcesChatbot() {
             setMessages((prev) => [...prev, botMessage]);
         } catch (error) {
             console.error('Chatbot error:', error);
-            const errorMessage: Message = { role: 'bot', content: 'Sorry, I am having trouble connecting. Please try again later.' };
+            const errorMessage: Message = { role: 'bot', content: 'Sorry, I am having trouble connecting. The AI model might be overloaded. Please try again later.' };
             setMessages((prev) => [...prev, errorMessage]);
         } finally {
             setLoading(false);
