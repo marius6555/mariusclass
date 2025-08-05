@@ -119,48 +119,66 @@ export default function AdminPage() {
     };
     
     const handleBackgroundUpload = async () => {
-        if (!newBgFile) {
+      if (!newBgFile) {
+        toast({
+          variant: 'destructive',
+          title: 'No File Selected',
+          description: 'Please select an image file to upload.',
+        });
+        return;
+      }
+
+      setUploading(true);
+      try {
+        const storageRef = ref(storage, 'backgrounds/home-background');
+        const reader = new FileReader();
+        
+        reader.readAsDataURL(newBgFile);
+        reader.onload = async (event) => {
+          try {
+            const dataUrl = event.target?.result as string;
+            await uploadString(storageRef, dataUrl, 'data_url');
+            const downloadUrl = await getDownloadURL(storageRef);
+
+            await setDoc(doc(db, 'settings', 'homePage'), {
+              backgroundUrl: downloadUrl,
+            });
+
+            setBackgroundUrl(downloadUrl);
+            setNewBgFile(null);
+            toast({
+              title: 'Upload Successful',
+              description: 'Home page background has been updated.',
+            });
+          } catch (error) {
+             console.error('Error during upload/DB update:', error);
+             toast({
+                variant: 'destructive',
+                title: 'Upload Failed',
+                description: 'Could not update the background image. Check console for details.',
+             });
+          } finally {
+             setUploading(false);
+          }
+        };
+        reader.onerror = (error) => {
+            console.error("File reading error:", error);
             toast({
                 variant: "destructive",
-                title: "No File Selected",
-                description: "Please select an image file to upload.",
+                title: "File Error",
+                description: "Could not read the selected file.",
             });
-            return;
-        }
-
-        setUploading(true);
-        try {
-            const storageRef = ref(storage, 'backgrounds/home-background');
-            
-            const reader = new FileReader();
-            reader.readAsDataURL(newBgFile);
-            reader.onload = async (event) => {
-                const dataUrl = event.target?.result as string;
-                await uploadString(storageRef, dataUrl, 'data_url');
-                const downloadUrl = await getDownloadURL(storageRef);
-
-                await setDoc(doc(db, "settings", "homePage"), {
-                    backgroundUrl: downloadUrl,
-                });
-
-                setBackgroundUrl(downloadUrl);
-                setNewBgFile(null);
-                toast({
-                    title: "Upload Successful",
-                    description: "Home page background has been updated.",
-                });
-            };
-
-        } catch (error) {
-            console.error("Error uploading background:", error);
-            toast({
-                variant: "destructive",
-                title: "Upload Failed",
-                description: "Could not upload the new background image.",
-            });
-        } finally {
             setUploading(false);
-        }
+        };
+      } catch (error) {
+        console.error('Error setting up background upload:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Upload Failed',
+          description: 'An unexpected error occurred before upload.',
+        });
+        setUploading(false);
+      }
     };
 
 
@@ -321,5 +339,7 @@ export default function AdminPage() {
         </SidebarInset>
     );
 }
+
+    
 
     
