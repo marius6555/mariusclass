@@ -19,6 +19,8 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
+import imageCompression from 'browser-image-compression';
+
 
 type Message = {
     id: string;
@@ -129,11 +131,21 @@ export default function AdminPage() {
       }
 
       setUploading(true);
+
       try {
-        const storageRef = ref(storage, 'backgrounds/home-background');
-        const reader = new FileReader();
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        };
+
+        const compressedFile = await imageCompression(newBgFile, options);
         
-        reader.readAsDataURL(newBgFile);
+        const storageRef = ref(storage, 'backgrounds/home-background');
+        
+        const reader = new FileReader();
+        reader.readAsDataURL(compressedFile);
+        
         reader.onload = async (event) => {
           try {
             const dataUrl = event.target?.result as string;
@@ -150,8 +162,8 @@ export default function AdminPage() {
               title: 'Upload Successful',
               description: 'Home page background has been updated.',
             });
-          } catch (error) {
-             console.error('Error during upload/DB update:', error);
+          } catch (uploadError) {
+             console.error('Error during upload/DB update:', uploadError);
              toast({
                 variant: 'destructive',
                 title: 'Upload Failed',
@@ -161,6 +173,7 @@ export default function AdminPage() {
              setUploading(false);
           }
         };
+
         reader.onerror = (error) => {
             console.error("File reading error:", error);
             toast({
@@ -170,12 +183,12 @@ export default function AdminPage() {
             });
             setUploading(false);
         };
-      } catch (error) {
-        console.error('Error setting up background upload:', error);
+      } catch (compressionError) {
+        console.error('Error compressing image:', compressionError);
         toast({
           variant: 'destructive',
-          title: 'Upload Failed',
-          description: 'An unexpected error occurred before upload.',
+          title: 'Compression Failed',
+          description: 'Could not compress the image before upload.',
         });
         setUploading(false);
       }
@@ -339,7 +352,3 @@ export default function AdminPage() {
         </SidebarInset>
     );
 }
-
-    
-
-    
