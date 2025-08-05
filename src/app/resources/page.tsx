@@ -20,6 +20,7 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
+import { ResourcesChatbot } from "@/components/resources-chatbot";
 
 const formSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
@@ -186,12 +187,12 @@ export default function ResourcesPage() {
                       {items.map((item) => (
                         <li key={item.id} className="flex items-center justify-between p-4 rounded-lg border bg-background">
                           <span className="font-medium">{item.title}</span>
-                          <Link href={item.href} target="_blank">
-                            <Button variant="ghost" size="icon">
-                                  {item.type === 'file' ? <Download /> : <LinkIcon />}
-                                  <span className="sr-only">{item.type === 'file' ? 'Download' : 'Open link'}</span>
-                            </Button>
-                          </Link>
+                           <Link href={item.href} target="_blank">
+                             <Button variant="ghost" size="icon">
+                                   {item.type === 'file' ? <Download /> : <LinkIcon />}
+                                   <span className="sr-only">{item.type === 'file' ? 'Download' : 'Open link'}</span>
+                             </Button>
+                           </Link>
                         </li>
                       ))}
                     </ul>
@@ -208,6 +209,7 @@ export default function ResourcesPage() {
             </div>
         )}
       </main>
+      <ResourcesChatbot />
     </SidebarInset>
   );
 }
