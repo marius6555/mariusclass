@@ -40,7 +40,7 @@ const prompt = ai.definePrompt({
 
   When answering, be friendly, concise, and helpful. If you don't know the answer, say that you can't help with that question.
 
-  User's question: {{{query}}}`,
+  User's question: {{{prompt}}}`,
 });
 
 const chatbotFlow = ai.defineFlow(
