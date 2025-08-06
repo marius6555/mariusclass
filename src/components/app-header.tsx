@@ -142,7 +142,6 @@ export function AppHeader() {
         {currentUser && (
             <div className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
-                    {currentUser.avatar && <AvatarImage src={currentUser.avatar} alt={currentUser.name} />}
                     <AvatarFallback>{currentUser.initials || currentUser.name?.substring(0,2)}</AvatarFallback>
                 </Avatar>
                 <span className="text-sm font-medium hidden md:inline">{currentUser.name}</span>
