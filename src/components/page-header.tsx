@@ -8,7 +8,7 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, description }: PageHeaderProps) {
   return (
-    <header className="flex items-center gap-4 p-4 lg:p-6 border-b bg-card">
+    <header className="flex items-center gap-4 p-4 lg:p-6 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-20">
       <SidebarTrigger className="md:hidden" />
       <div className="flex items-center gap-4">
         <div className="bg-primary p-3 rounded-lg hidden md:block">

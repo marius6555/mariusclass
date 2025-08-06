@@ -30,7 +30,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
         >
-            <div className="flex flex-col min-h-svh">
+            <div className="flex flex-col">
                 <div className="flex-grow">
                     <SidebarProvider>
                         <AppSidebar />

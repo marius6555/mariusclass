@@ -21,6 +21,7 @@ import {
   Users,
   Shield,
 } from "lucide-react"
+import { Link as ScrollLink } from "react-scroll";
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import React, { useState, useEffect } from 'react';
@@ -29,16 +30,16 @@ import { ThemeToggle } from "./theme-toggle"
 
 
 const baseLinks = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/auth", label: "Login/Sign Up", icon: LogIn },
-  { href: "/students", label: "Student Profiles", icon: Users },
-  { href: "/projects", label: "Project Hub", icon: FolderKanban },
-  { href: "/events", label: "Events/Updates", icon: CalendarClock },
-  { href: "/resources", label: "Resources", icon: BookCopy },
-  { href: "/contact", label: "Contact/Join Us", icon: Mail },
+  { to: "home", label: "Home", icon: Home },
+  { href: "/auth", label: "Login/Sign Up", icon: LogIn, isExternal: true },
+  { to: "students", label: "Student Profiles", icon: Users },
+  { to: "projects", label: "Project Hub", icon: FolderKanban },
+  { to: "events", label: "Events/Updates", icon: CalendarClock },
+  { to: "resources", label: "Resources", icon: BookCopy },
+  { to: "contact", label: "Contact/Join Us", icon: Mail },
 ];
 
-const adminLink = { href: "/admin", label: "Admin", icon: Shield };
+const adminLink = { href: "/admin", label: "Admin", icon: Shield, isExternal: true };
 
 const ADMIN_EMAIL = "tingiya730@gmail.com";
 
@@ -61,12 +62,11 @@ export function AppSidebar() {
   
   const navLinks = [...baseLinks];
   if(isAdmin) {
-    // Insert admin link after "Contact/Join Us"
-    const contactIndex = navLinks.findIndex(link => link.href === '/contact');
+    const contactIndex = navLinks.findIndex(link => link.to === 'contact');
     if (contactIndex !== -1) {
         navLinks.splice(contactIndex + 1, 0, adminLink);
     } else {
-        navLinks.push(adminLink); // fallback
+        navLinks.push(adminLink);
     }
   }
 
@@ -84,16 +84,31 @@ export function AppSidebar() {
         </SidebarHeader>
         <SidebarMenu>
           {navLinks.map((link) => (
-            <SidebarMenuItem key={link.href}>
-              <Link href={link.href}>
-                <SidebarMenuButton
-                  isActive={pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href))}
-                  tooltip={link.label}
+            <SidebarMenuItem key={link.to || link.href}>
+              {link.isExternal ? (
+                 <Link href={link.href!}>
+                    <SidebarMenuButton
+                      isActive={pathname === link.href}
+                      tooltip={link.label}
+                    >
+                      <link.icon />
+                      <span>{link.label}</span>
+                    </SidebarMenuButton>
+                 </Link>
+              ) : (
+                <ScrollLink
+                  to={link.to!}
+                  smooth={true}
+                  duration={500}
+                  spy={true}
+                  offset={-70}
+                  activeClass="bg-sidebar-accent text-sidebar-accent-foreground"
+                  className="flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 cursor-pointer"
                 >
                   <link.icon />
                   <span>{link.label}</span>
-                </SidebarMenuButton>
-              </Link>
+                </ScrollLink>
+              )}
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
