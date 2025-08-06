@@ -2,7 +2,6 @@
 'use server';
 
 import {ai} from '@/ai/genkit';
-import {generate} from 'genkit';
 import {z} from 'zod';
 import { chatRequestSchema } from '@/ai/schemas/chat';
 
@@ -14,7 +13,7 @@ export const chatFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async ({message, history}) => {
-    const llmResponse = await generate({
+    const llmResponse = await ai.generate({
       model: 'googleai/gemini-pro',
       prompt: {
         messages: [
