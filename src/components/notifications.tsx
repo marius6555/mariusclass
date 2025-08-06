@@ -1,0 +1,101 @@
+
+'use client'
+
+import React, { useState, useEffect } from 'react';
+import { Bell, Check, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp, limit } from 'firebase/firestore';
+import { Badge } from './ui/badge';
+import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
+
+type Notification = {
+  id: string;
+  message: string;
+  createdAt: Timestamp;
+  read: boolean;
+  link: string;
+  type: string;
+};
+
+export function Notifications() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(10));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const notifs = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Notification));
+      setNotifications(notifs);
+      setUnreadCount(notifs.filter(n => !n.read).length);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleMarkAsRead = async (id: string) => {
+    const notifRef = doc(db, "notifications", id);
+    await updateDoc(notifRef, { read: true });
+  };
+  
+  const handleMarkAllAsRead = async () => {
+    notifications.forEach(async (n) => {
+      if (!n.read) {
+        await handleMarkAsRead(n.id);
+      }
+    })
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="relative">
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full p-0"
+            >
+              {unreadCount}
+            </Badge>
+          )}
+          <span className="sr-only">Open notifications</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0">
+        <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-semibold">Notifications</h3>
+            {unreadCount > 0 && (
+                <Button variant="link" size="sm" onClick={handleMarkAllAsRead} className="p-0 h-auto">Mark all as read</Button>
+            )}
+        </div>
+        <div className="max-h-96 overflow-y-auto">
+            {notifications.length > 0 ? (
+                notifications.map((n) => (
+                    <div key={n.id} className={`p-4 border-b last:border-b-0 ${!n.read ? 'bg-accent/50' : ''}`}>
+                        <Link href={n.link || '#'} passHref>
+                            <a className="block hover:bg-muted/50 -m-4 p-4" onClick={() => handleMarkAsRead(n.id)}>
+                                <p className="text-sm mb-1">{n.message}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {formatDistanceToNow(n.createdAt.toDate(), { addSuffix: true })}
+                                </p>
+                            </a>
+                        </Link>
+                    </div>
+                ))
+            ) : (
+                <div className="text-center text-muted-foreground p-8">
+                    <Zap className="mx-auto h-8 w-8 mb-2"/>
+                    <p>No new notifications.</p>
+                </div>
+            )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}

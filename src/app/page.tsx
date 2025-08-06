@@ -686,7 +686,14 @@ function ProjectsSection() {
 
   const onSave = async (data: any) => {
     try {
-      await addDoc(collection(db, "projects"), data);
+      const projectDocRef = await addDoc(collection(db, "projects"), data);
+      await addDoc(collection(db, "notifications"), {
+        message: `New project added: "${data.title}" by ${data.author}`,
+        type: 'new_project',
+        link: `/projects#${projectDocRef.id}`,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
       toast({ title: "Project Added!", description: "Your project has been added to the hub." });
       fetchProjects();
       setIsDialogOpen(false);
@@ -746,7 +753,7 @@ function ProjectsSection() {
                 {projects
                   .filter((p) => category === "All" || p.category === category)
                   .map((project) => (
-                    <Card key={project.id} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                    <Card key={project.id} id={project.id} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
                       <div className="aspect-video relative">
                         <img 
                           src={isValidImageUrl(project.image) ? project.image : 'https://placehold.co/600x400.png'} 
@@ -809,7 +816,14 @@ function EventForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange:
 
   const handleSubmit = async (values: EventFormValues) => {
     try {
-      await addDoc(collection(db, "events"), values);
+      const eventDocRef = await addDoc(collection(db, "events"), values);
+      await addDoc(collection(db, "notifications"), {
+        message: `New ${values.type}: ${values.title}`,
+        type: 'new_event',
+        link: `/events#${eventDocRef.id}`,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
       onSave();
       onOpenChange(false);
       form.reset();
@@ -916,7 +930,7 @@ function EventsSection() {
             </div>
           )}
           {events.map((event) => (
-            <div key={event.id} className="relative mb-8 flex items-start gap-6">
+            <div key={event.id} id={event.id} className="relative mb-8 flex items-start gap-6">
               <div className="absolute left-3 top-1.5 flex -translate-x-1/2 items-center justify-center rounded-full bg-background p-0.5">
                 <div className={`flex h-6 w-6 items-center justify-center rounded-full ${event.type === 'deadline' ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'}`}>
                   {eventConfig[event.type]?.icon || <Calendar className="h-4 w-4" />}
@@ -967,7 +981,14 @@ function ResourceForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChan
 
   const handleSubmit = async (values: ResourceFormValues) => {
     try {
-      await addDoc(collection(db, "resources"), values);
+      const resourceDocRef = await addDoc(collection(db, "resources"), values);
+      await addDoc(collection(db, "notifications"), {
+        message: `New resource added in ${values.category}: ${values.title}`,
+        type: 'new_resource',
+        link: `/resources#${resourceDocRef.id}`,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
       onSave();
       onOpenChange(false);
       form.reset();
@@ -1084,7 +1105,7 @@ function ResourcesSection() {
         )}
         <Accordion type="single" collapsible defaultValue={Object.keys(resources)[0]} className="w-full space-y-4 mt-6">
           {Object.entries(resources).map(([category, items]) => (
-            <AccordionItem value={category} key={category} className="border-none">
+            <AccordionItem value={category} key={category} id={items[0].id} className="border-none">
               <Card>
                 <AccordionTrigger className="p-6 font-headline text-xl hover:no-underline">
                   {category}
@@ -1289,5 +1310,3 @@ function ContactSection() {
       </div>
   );
 }
-
-    

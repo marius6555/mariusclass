@@ -13,6 +13,7 @@ import type { Student } from '@/types';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { Notifications } from './notifications';
 
 const baseLinks = [
   { to: "home", label: "Home", icon: Home },
@@ -137,6 +138,7 @@ export function AppHeader() {
         <h1 className="font-headline text-xl font-semibold hidden sm:block">ClassHub</h1>
       </Link>
       <div className="flex items-center gap-2">
+        <Notifications />
         <ThemeToggle />
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>
