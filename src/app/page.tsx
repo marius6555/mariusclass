@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { serverTimestamp } from 'firebase/firestore';
+import imageCompression from 'browser-image-compression';
 
 
 // Common types
@@ -1163,6 +1164,8 @@ const contactFormSchema = z.object({
   message: z.string().min(10, { message: "Message must be at least 10 characters." }).max(500),
 });
 
+type ContactFormValues = z.infer<typeof contactFormSchema>;
+
 const ADMIN_EMAIL_CONTACT = "tingiya730@gmail.com";
 
 function ContactSection() {
@@ -1188,7 +1191,7 @@ function ContactSection() {
     fetchAdmin();
   }, []);
 
-  const form = useForm<z.infer<typeof contactFormSchema>>({
+  const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
     defaultValues: {
       name: "",
@@ -1198,7 +1201,7 @@ function ContactSection() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof contactFormSchema>>) {
+  async function onSubmit(values: ContactFormValues) {
     try {
       await addDoc(collection(db, "messages"), {
         ...values,
