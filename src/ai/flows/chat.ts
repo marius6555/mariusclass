@@ -15,12 +15,10 @@ export const chatFlow = ai.defineFlow(
   async ({message, history}) => {
     const llmResponse = await ai.generate({
       model: 'googleai/gemini-pro',
-      prompt: {
-        messages: [
-            ...history,
-            {role: 'user' as const, content: [{text: message}]},
-        ],
-      },
+      messages: [
+          ...history,
+          {role: 'user' as const, content: [{text: message}]},
+      ],
       config: {
         temperature: 0.5,
       },
