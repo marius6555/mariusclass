@@ -11,7 +11,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDRLsuxwEAC4EV2Iq9iS_fKYIPM6S7LbkU",
   authDomain: "computer-classhub.firebaseapp.com",
   projectId: "computer-classhub",
-  storageBucket: "computer-classhub.firebasestorage.app",
+  storageBucket: "computer-classhub.appspot.com",
   messagingSenderId: "612390466146",
   appId: "1:612390466146:web:f470186f0450833c82d73b"
 };
