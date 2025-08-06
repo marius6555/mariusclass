@@ -8,7 +8,7 @@ import { Link as ScrollLink } from "react-scroll";
 import { GraduationCap, Home, Users, FolderKanban, CalendarClock, BookCopy, Mail, LogIn, Shield, Menu } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { Button } from './ui/button';
-import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import type { Student } from '@/types';
 
 const baseLinks = [
@@ -103,6 +103,9 @@ export function AppHeader() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right">
+            <SheetHeader>
+                <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+            </SheetHeader>
             <div className="p-4">
               <nav className="flex flex-col gap-2">
                 {navLinks.map((link) => (
