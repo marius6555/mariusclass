@@ -14,6 +14,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Notifications } from './notifications';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 const baseLinks = [
   { to: "home", label: "Home", icon: Home },
@@ -70,7 +71,7 @@ export function AppHeader() {
     
     if (currentUser) {
       if (isAdmin) {
-        const contactIndex = links.findIndex(link => link.to === 'contact');
+        const contactIndex = links.findIndex(link => 'to' in link && link.to === 'contact');
         if (contactIndex !== -1) {
             links.splice(contactIndex + 1, 0, adminLink);
         } else {
@@ -137,29 +138,40 @@ export function AppHeader() {
         </div>
         <h1 className="font-headline text-xl font-semibold hidden sm:block">ClassHub</h1>
       </Link>
-      <div className="flex items-center gap-2">
-        <Notifications />
-        <ThemeToggle />
-        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Open navigation menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <SheetHeader>
-                <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-            </SheetHeader>
-            <div className="p-4">
-              <nav className="flex flex-col gap-2">
-                {navLinks.map((link) => (
-                  <NavLink key={link.to || link.href || link.label} link={link} />
-                ))}
-              </nav>
+      <div className="flex items-center gap-4">
+        {currentUser && (
+            <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                    <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
+                    <AvatarFallback>{currentUser.initials}</AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium hidden md:inline">{currentUser.name}</span>
             </div>
-          </SheetContent>
-        </Sheet>
+        )}
+        <div className="flex items-center gap-2">
+            <Notifications />
+            <ThemeToggle />
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+            <SheetTrigger asChild>
+                <Button variant="outline" size="icon">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Open navigation menu</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="right">
+                <SheetHeader>
+                    <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                </SheetHeader>
+                <div className="p-4">
+                <nav className="flex flex-col gap-2">
+                    {navLinks.map((link) => (
+                    <NavLink key={link.to || link.href || link.label} link={link} />
+                    ))}
+                </nav>
+                </div>
+            </SheetContent>
+            </Sheet>
+        </div>
       </div>
     </header>
   );
