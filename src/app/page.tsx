@@ -580,17 +580,13 @@ const projectFormSchema = z.object({
   category: z.string().min(2, "Category must be at least 2 characters."),
   description: z.string().min(10, "Description must be at least 10 characters."),
   link: z.string().url("Please enter a valid URL."),
-  image: z.string().url("Please enter a valid image URL.").optional().or(z.literal('')),
+  image: z.any().optional(),
   tags: z.string().min(2, "Please list at least one tag."),
 });
 
 type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
 const projectCategories = ["All", "AI", "Web Dev", "Mobile", "Data Science", "Cybersecurity"];
-
-const isValidImageUrl = (url: string) => {
-    return url.match(/\.(jpeg|jpg|gif|png|svg|webp)$/) !== null;
-}
 
 function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => void, onOpenChange: (open: boolean) => void, author: string }) {
   const form = useForm<ProjectFormValues>({
@@ -600,33 +596,38 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
       category: "",
       description: "",
       link: "",
-      image: "",
+      image: null,
       tags: "",
     },
   });
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+        form.setValue("image", reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   const handleSubmit = async (values: ProjectFormValues) => {
-    try {
-      let imageUrl = values.image;
-      if (!imageUrl || !isValidImageUrl(imageUrl)) {
-        imageUrl = "https://placehold.co/600x400.png";
-      }
-
-      const projectData = {
-        title: values.title,
-        category: values.category,
-        description: values.description,
-        link: values.link,
-        image: imageUrl,
-        tags: values.tags.split(",").map(t => t.trim()),
-        hint: 'abstract',
-        author: author,
-      };
-      onSave(projectData);
-      onOpenChange(false);
-    } catch (error) {
-      console.error("Error saving project: ", error);
-    }
+    const projectData = {
+      title: values.title,
+      category: values.category,
+      description: values.description,
+      link: values.link,
+      image: values.image,
+      tags: values.tags.split(",").map(t => t.trim()),
+      hint: 'abstract',
+      author: author,
+    };
+    onSave(projectData);
+    onOpenChange(false);
   };
 
   return (
@@ -644,9 +645,14 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
         <FormField control={form.control} name="link" render={({ field }) => (
           <FormItem><FormLabel>Project URL</FormLabel><FormControl><Input placeholder="https://github.com/user/project" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
-        <FormField control={form.control} name="image" render={({ field }) => (
-          <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/600x400.png" {...field} /></FormControl><FormMessage /></FormItem>
-        )} />
+        <FormItem>
+            <FormLabel>Project Image</FormLabel>
+            <FormControl>
+              <Input type="file" accept="image/*" onChange={handleImageChange} />
+            </FormControl>
+            {preview && <img src={preview} alt="Project preview" className="mt-4 rounded-md object-cover w-full h-auto" />}
+            <FormMessage />
+        </FormItem>
         <FormField control={form.control} name="tags" render={({ field }) => (
           <FormItem><FormLabel>Tags (comma-separated)</FormLabel><FormControl><Input placeholder="Python, NLTK, Flask" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
@@ -686,17 +692,29 @@ function ProjectsSection() {
 
   const onSave = async (data: any) => {
     try {
-      const projectDocRef = await addDoc(collection(db, "projects"), data);
-      await addDoc(collection(db, "notifications"), {
-        message: `New project added: "${data.title}" by ${data.author}`,
-        type: 'new_project',
-        link: `/projects#${projectDocRef.id}`,
-        createdAt: serverTimestamp(),
-        read: false,
-      });
-      toast({ title: "Project Added!", description: "Your project has been added to the hub." });
-      fetchProjects();
-      setIsDialogOpen(false);
+        let imageUrl = "https://placehold.co/600x400.png";
+        let projectDocRefForId = doc(collection(db, "projects")); // Create a ref to get an ID first
+
+        if (data.image && data.image.startsWith('data:image')) {
+            const storageRef = ref(storage, `projects/${projectDocRefForId.id}`);
+            await uploadString(storageRef, data.image, 'data_url');
+            imageUrl = await getDownloadURL(storageRef);
+        }
+        
+        const finalProjectData = { ...data, image: imageUrl, id: projectDocRefForId.id };
+        await setDoc(projectDocRefForId, finalProjectData);
+      
+        await addDoc(collection(db, "notifications"), {
+            message: `New project added: "${data.title}" by ${data.author}`,
+            type: 'new_project',
+            link: `/projects#${projectDocRefForId.id}`,
+            createdAt: serverTimestamp(),
+            read: false,
+        });
+
+        toast({ title: "Project Added!", description: "Your project has been added to the hub." });
+        fetchProjects();
+        setIsDialogOpen(false);
     } catch (error) {
       console.error("Error saving project:", error);
       toast({ variant: "destructive", title: "Save failed", description: "There was an issue saving your project."});
@@ -756,7 +774,7 @@ function ProjectsSection() {
                     <Card key={project.id} id={project.id} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
                       <div className="aspect-video relative">
                         <img 
-                          src={isValidImageUrl(project.image) ? project.image : 'https://placehold.co/600x400.png'} 
+                          src={project.image || 'https://placehold.co/600x400.png'} 
                           alt={project.title} 
                           className="object-cover w-full h-full" 
                           data-ai-hint={project.hint} 
