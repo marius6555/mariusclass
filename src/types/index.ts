@@ -4,9 +4,7 @@ export type Student = {
   name: string;
   major: string;
   interests: string[];
-  avatar: string;
   initials: string;
-  hint: string;
   email?: string;
   uid?: string;
   bio?: string;

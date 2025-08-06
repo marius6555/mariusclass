@@ -112,7 +112,6 @@ const studentFormSchema = z.object({
   interests: z.string().min(2, "Please list at least one interest."),
   bio: z.string().min(10, "Bio must be at least 10 characters.").optional(),
   hobbies: z.string().min(2, "Please list at least one hobby.").optional(),
-  avatar: z.any().optional(),
   github: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
   linkedin: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
   instagram: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
@@ -131,7 +130,6 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
       interests: student?.interests?.join(", ") || "",
       bio: student?.bio || "",
       hobbies: student?.hobbies?.join(", ") || "",
-      avatar: null,
       github: student?.github || "",
       linkedin: student?.linkedin || "",
       instagram: student?.instagram || "",
@@ -139,20 +137,6 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
       whatsapp: student?.whatsapp || "",
     },
   });
-  const [preview, setPreview] = useState<string | null>(student?.avatar || null);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-        form.setValue("avatar", reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleSubmit = async (values: StudentFormValues) => {
     const studentData = {
@@ -160,11 +144,6 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
       interests: values.interests.split(",").map(i => i.trim()),
       hobbies: values.hobbies?.split(",").map(i => i.trim()) || [],
     };
-    if (preview && preview !== student?.avatar) {
-      studentData.avatar = preview;
-    } else {
-      delete studentData.avatar;
-    }
     onSave(studentData);
     onOpenChange(false);
   };
@@ -172,23 +151,6 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-        <FormItem className="flex flex-col items-center">
-            <FormLabel htmlFor="avatar-upload" className="cursor-pointer">
-              <div className="relative group">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={preview || `https://placehold.co/100x100.png`} alt={form.getValues("name")} />
-                  <AvatarFallback>{form.getValues("name")?.substring(0,2)}</AvatarFallback>
-                </Avatar>
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="text-white h-8 w-8" />
-                </div>
-              </div>
-            </FormLabel>
-            <FormControl>
-              <Input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} ref={avatarInputRef} />
-            </FormControl>
-            <FormMessage />
-        </FormItem>
         <FormField control={form.control} name="name" render={({ field }) => (
           <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Ada Lovelace" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
@@ -292,44 +254,24 @@ function StudentsSection() {
     
     let studentToUpdate = students.find(s => s.uid === currentUser.uid);
     const isNew = !studentToUpdate;
-
-    let avatarUrl = studentToUpdate?.avatar;
-
-    if (data.avatar && data.avatar.startsWith('data:image')) {
-      const storageRef = ref(storage, `avatars/${currentUser.uid}`);
-      if (avatarUrl && avatarUrl.includes('firebasestorage')) {
-          try {
-            await deleteObject(ref(storage, avatarUrl));
-          } catch(e:any) {
-              if (e.code !== 'storage/object-not-found') {
-                  console.error("Could not delete old avatar", e);
-              }
-          }
-      }
-      await uploadString(storageRef, data.avatar, 'data_url');
-      avatarUrl = await getDownloadURL(storageRef);
-    }
   
     const studentData = {
       ...data,
       uid: currentUser.uid,
       email: currentUser.email,
-      avatar: avatarUrl || studentToUpdate?.avatar,
       initials: data.name.split(" ").map((n:string) => n[0]).join(""),
-      hint: 'person',
     };
-    delete studentData.avatar;
   
     try {
-      let updatedStudentDoc: Student;
+      let updatedStudentDoc: Omit<Student, 'id'>;
       if (isNew) {
         const docRef = await addDoc(collection(db, "students"), studentData);
-        updatedStudentDoc = { id: docRef.id, ...studentData, avatar: avatarUrl };
+        updatedStudentDoc = { ...studentData };
         toast({ title: "Profile Created!", description: "Your student profile is now live." });
       } else if(studentToUpdate?.id) {
         const studentRef = doc(db, "students", studentToUpdate.id);
-        await updateDoc(studentRef, { ...studentData, avatar: avatarUrl });
-        updatedStudentDoc = { ...studentToUpdate, ...studentData, avatar: avatarUrl };
+        await updateDoc(studentRef, { ...studentData });
+        updatedStudentDoc = { ...studentToUpdate, ...studentData };
         toast({ title: "Profile Updated!", description: "Your changes have been saved." });
       } else {
         throw new Error("Could not find student profile to update.");
@@ -363,16 +305,6 @@ function StudentsSection() {
     try {
       const credential = EmailAuthProvider.credential(auth.currentUser.email!, password);
       await reauthenticateWithCredential(auth.currentUser, credential);
-
-      if (currentUser.avatar && currentUser.avatar.includes('firebasestorage')) {
-        const avatarRef = ref(storage, currentUser.avatar);
-        await deleteObject(avatarRef).catch(error => {
-            if (error.code !== 'storage/object-not-found') {
-                throw error;
-            }
-            console.log("Avatar not found, skipping delete.");
-        });
-      }
 
       await deleteDoc(doc(db, "students", currentUser.id));
       await deleteUser(auth.currentUser);
@@ -446,7 +378,6 @@ function StudentsSection() {
                         <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
                              <div className="flex-shrink-0 text-center">
                                 <Avatar className="w-32 h-32 mb-4 mx-auto">
-                                    <AvatarImage src={viewingStudent.avatar} alt={viewingStudent.name} />
                                     <AvatarFallback>{viewingStudent.initials}</AvatarFallback>
                                 </Avatar>
                                 <h3 className="font-bold text-lg">{viewingStudent.name}</h3>
@@ -513,7 +444,6 @@ function StudentsSection() {
             <Card key={student.id} className="flex flex-col">
               <CardHeader className="items-center text-center">
                 <Avatar className="w-24 h-24 mb-4">
-                  <AvatarImage src={student.avatar} alt={student.name} data-ai-hint={student.hint} />
                   <AvatarFallback>{student.initials}</AvatarFallback>
                 </Avatar>
                 <CardTitle className="font-headline">{student.name}</CardTitle>
@@ -1242,7 +1172,6 @@ function ContactSection() {
               <Card>
                 <CardHeader className="flex flex-row items-center gap-4">
                   <Avatar className="w-16 h-16">
-                    <AvatarImage src={admin.avatar} alt={admin.name} data-ai-hint={admin.hint} />
                     <AvatarFallback>{admin.initials}</AvatarFallback>
                   </Avatar>
                   <div>

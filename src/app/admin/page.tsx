@@ -194,7 +194,6 @@ export default function AdminPage() {
                                     <TableRow key={student.id}>
                                         <TableCell>
                                             <Avatar>
-                                                <AvatarImage src={student.avatar} alt={student.name} />
                                                 <AvatarFallback>{student.initials}</AvatarFallback>
                                             </Avatar>
                                         </TableCell>
@@ -212,5 +211,3 @@ export default function AdminPage() {
         </main>
     );
 }
-
-    
