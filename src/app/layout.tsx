@@ -1,10 +1,9 @@
 
 import type { Metadata } from 'next';
 import './globals.css';
-import { SidebarProvider } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/app-sidebar';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
+import { AppHeader } from '@/components/app-header';
 
 export const metadata: Metadata = {
   title: 'ClassHub Central',
@@ -31,11 +30,9 @@ export default function RootLayout({
             disableTransitionOnChange
         >
             <div className="flex flex-col">
+                <AppHeader />
                 <div className="flex-grow">
-                    <SidebarProvider>
-                        <AppSidebar />
-                        {children}
-                    </SidebarProvider>
+                    {children}
                 </div>
                 <footer className="text-center p-4 text-sm italic text-muted-foreground border-t">
                     Where innovation begins and ideas take flight.

@@ -3,7 +3,6 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -17,6 +16,7 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft } from 'lucide-react';
 
 const signUpSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -84,6 +84,17 @@ export default function AuthPage() {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
+        // Allow admin login without student profile
+        if (values.email.toLowerCase() === "tingiya730@gmail.com") {
+           const adminUser = {
+              email: values.email.toLowerCase(),
+              name: 'Admin',
+           }
+           localStorage.setItem("currentUser", JSON.stringify(adminUser));
+           toast({ title: "Admin Login Successful!", description: "Welcome back!" });
+           router.push('/admin');
+           return;
+        }
         throw new Error("No student profile found for this user.");
       }
       
@@ -108,13 +119,17 @@ export default function AuthPage() {
 
 
   return (
-    <SidebarInset>
-      <PageHeader
-        title="Join or Login"
-        description="Create an account or sign in to manage your profile and projects."
-      />
-      <main className="p-6 lg:p-8 flex justify-center">
-        <Tabs defaultValue="login" className="w-[400px]">
+    <main className="container mx-auto flex flex-col items-center justify-center p-6 lg:p-8 min-h-screen">
+      <div className="w-full max-w-[400px]">
+        <Button variant="outline" onClick={() => router.push('/')} className="mb-8">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Home
+        </Button>
+        <PageHeader
+            title="Join or Login"
+            description="Create an account or sign in to manage your profile and projects."
+        />
+        <Tabs defaultValue="login" className="w-full mt-8">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -165,7 +180,7 @@ export default function AuthPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </main>
-    </SidebarInset>
+      </div>
+    </main>
   );
 }

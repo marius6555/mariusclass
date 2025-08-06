@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { SidebarInset } from "@/components/ui/sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,7 +13,7 @@ import { collection, getDocs, query, orderBy, Timestamp, doc, updateDoc, setDoc,
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import type { Student } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Mail, Upload } from 'lucide-react';
+import { Mail, Upload, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -197,20 +196,24 @@ export default function AdminPage() {
 
     if (loading) {
         return (
-            <SidebarInset>
+            <main className="container mx-auto p-6 lg:p-8">
                 <PageHeader title="Admin Dashboard" description="Loading..." />
-                <main className="p-6 lg:p-8"><p>Loading dashboard...</p></main>
-            </SidebarInset>
+                <p>Loading dashboard...</p>
+            </main>
         );
     }
     
     return (
-        <SidebarInset>
+        <main className="container mx-auto p-6 lg:p-8 pt-24">
+             <Button variant="outline" onClick={() => router.push('/')} className="mb-8">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Home
+            </Button>
             <PageHeader
                 title="Admin Dashboard"
                 description="View messages and manage student profiles."
             />
-            <main className="p-6 lg:p-8 space-y-8">
+            <div className="space-y-8 mt-8">
                 <Card>
                     <CardHeader>
                         <CardTitle>Home Page Settings</CardTitle>
@@ -348,7 +351,7 @@ export default function AdminPage() {
                         </Table>
                     </CardContent>
                 </Card>
-            </main>
-        </SidebarInset>
+            </div>
+        </main>
     );
 }

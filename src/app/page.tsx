@@ -2,7 +2,6 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { SidebarInset } from "@/components/ui/sidebar";
 import Image from "next/image";
 import { GraduationCap, ExternalLink, PlusCircle, Mail, Briefcase, Trash2, Edit, Camera, Eye, Github, Linkedin, Instagram, Facebook, Download, Link as LinkIcon, Bell, Calendar, Milestone } from "lucide-react";
 import { db, storage, auth } from "@/lib/firebase";
@@ -90,8 +89,8 @@ export default function Home() {
   }, []);
 
   return (
-    <SidebarInset>
-        <div id="home" className="relative flex flex-col justify-center items-center text-center p-8 h-screen">
+    <main>
+        <div id="home" className="relative flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px]">
             <div className="absolute inset-0 z-0">
                 {!loading && (
                     <Image 
@@ -134,7 +133,7 @@ export default function Home() {
         <div id="contact" className="py-16 lg:py-24 bg-background">
           <ContactSection />
         </div>
-    </SidebarInset>
+    </main>
   );
 }
 
@@ -448,7 +447,7 @@ function StudentsSection() {
   const userHasProfile = useMemo(() => students.some(s => s.uid === currentUser?.uid), [students, currentUser]);
 
   return (
-      <main className="p-6 lg:p-8">
+      <div className="container mx-auto p-6 lg:p-8">
         <PageHeader
           title="Student Profiles"
           description="Get to know your classmates."
@@ -603,7 +602,7 @@ function StudentsSection() {
             </Card>
           ))}
         </div>
-      </main>
+      </div>
   );
 }
 
@@ -735,7 +734,7 @@ function ProjectsSection() {
   };
 
   return (
-      <main className="p-6 lg:p-8">
+      <div className="container mx-auto p-6 lg:p-8">
         <PageHeader
           title="Project Hub"
           description="Discover innovative projects by students."
@@ -813,7 +812,7 @@ function ProjectsSection() {
             </TabsContent>
           ))}
         </Tabs>
-      </main>
+      </div>
   );
 }
 
@@ -922,7 +921,7 @@ function EventsSection() {
   const isAdmin = currentUser?.email === ADMIN_EMAIL_EVENTS;
 
   return (
-      <main className="p-6 lg:p-8">
+      <div className="container mx-auto p-6 lg:p-8">
         <PageHeader
           title="Events & Updates"
           description="Stay informed about important dates, announcements, and deadlines."
@@ -970,7 +969,7 @@ function EventsSection() {
             </div>
           ))}
         </div>
-      </main>
+      </div>
   );
 }
 
@@ -1097,7 +1096,7 @@ function ResourcesSection() {
   const isAdmin = currentUser?.email === ADMIN_EMAIL_RESOURCES;
   
   return (
-      <main className="p-6 lg:p-8">
+      <div className="container mx-auto p-6 lg:p-8">
         <PageHeader
           title="Resources"
           description="A curated collection of study materials and helpful links."
@@ -1151,7 +1150,7 @@ function ResourcesSection() {
               <p>There are no resources. As an admin, you can add one.</p>
             </div>
         )}
-      </main>
+      </div>
   );
 }
 
@@ -1224,7 +1223,7 @@ function ContactSection() {
   }
 
   return (
-      <main className="p-6 lg:p-8">
+      <div className="container mx-auto p-6 lg:p-8">
         <PageHeader
           title="Contact Us"
           description="Get in touch with the administrator."
@@ -1321,6 +1320,6 @@ function ContactSection() {
             </Card>
           </section>
         </div>
-      </main>
+      </div>
   );
 }
