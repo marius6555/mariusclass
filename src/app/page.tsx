@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { serverTimestamp } from 'firebase/firestore';
+import { Chatbot } from '@/components/chatbot';
 
 
 // Common types
@@ -100,6 +101,7 @@ export default function Home() {
         <div id="contact" className="py-16 lg:py-24 bg-background">
           <ContactSection />
         </div>
+        <Chatbot />
     </main>
   );
 }
