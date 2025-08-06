@@ -2,7 +2,6 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import Image from "next/image";
 import { GraduationCap, ExternalLink, PlusCircle, Mail, Briefcase, Trash2, Edit, Camera, Eye, Github, Linkedin, Instagram, Facebook, Download, Link as LinkIcon, Bell, Calendar, Milestone } from "lucide-react";
 import { db, storage, auth } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy, Timestamp, updateDoc, setDoc, addDoc, where, deleteDoc } from "firebase/firestore";
@@ -21,7 +20,7 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import type { Student } from '@/types';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
@@ -30,7 +29,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { serverTimestamp } from 'firebase/firestore';
-import imageCompression from 'browser-image-compression';
 
 
 // Common types
@@ -69,41 +67,10 @@ type GroupedResources = {
 
 // Main Home Page Component
 export default function Home() {
-  const [backgroundUrl, setBackgroundUrl] = useState('https://placehold.co/1200x800.png');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchBackground = async () => {
-      try {
-        const settingsDoc = await getDoc(doc(db, "settings", "homePage"));
-        if (settingsDoc.exists() && settingsDoc.data().backgroundUrl) {
-          setBackgroundUrl(settingsDoc.data().backgroundUrl);
-        }
-      } catch (error) {
-        console.error("Error fetching background image:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBackground();
-  }, []);
 
   return (
     <main>
-        <div id="home" className="relative flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px]">
-            <div className="absolute inset-0 z-0">
-                {!loading && (
-                    <Image 
-                        src={backgroundUrl} 
-                        alt="Classroom background"
-                        fill
-                        className="object-cover"
-                        data-ai-hint="classroom abstract"
-                        priority
-                    />
-                )}
-                <div className="absolute inset-0 bg-background/80" />
-            </div>
+        <div id="home" className="flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px] bg-background">
             <div className="relative z-10">
               <h1 className="font-headline text-4xl md:text-6xl font-bold tracking-tight">Welcome to</h1>
               <div className="bg-primary p-4 rounded-lg my-6 inline-block">
@@ -781,11 +748,10 @@ function ProjectsSection() {
                   .map((project) => (
                     <Card key={project.id} className="flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
                       <div className="aspect-video relative">
-                        <Image 
+                        <img 
                           src={isValidImageUrl(project.image) ? project.image : 'https://placehold.co/600x400.png'} 
                           alt={project.title} 
-                          fill 
-                          className="object-cover" 
+                          className="object-cover w-full h-full" 
                           data-ai-hint={project.hint} 
                         />
                       </div>
