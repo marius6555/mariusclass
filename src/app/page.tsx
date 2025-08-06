@@ -153,8 +153,10 @@ const studentFormSchema = z.object({
   whatsapp: z.string().min(10, "Please enter a valid WhatsApp number.").optional().or(z.literal('')),
 });
 
+type StudentFormValues = z.infer<typeof studentFormSchema>;
+
 function StudentForm({ student, onSave, onOpenChange }: { student: Student | null, onSave: (data: any) => void, onOpenChange: (open: boolean) => void }) {
-  const form = useForm<z.infer<typeof studentFormSchema>>({
+  const form = useForm<StudentFormValues>({
     resolver: zodResolver(studentFormSchema),
     defaultValues: {
       name: student?.name || "",
@@ -185,7 +187,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
     }
   };
 
-  const handleSubmit = async (values: z.infer<typeof studentFormSchema>>) => {
+  const handleSubmit = async (values: StudentFormValues) => {
     const studentData = {
       ...values,
       interests: values.interests.split(",").map(i => i.trim()),
@@ -615,6 +617,8 @@ const projectFormSchema = z.object({
   tags: z.string().min(2, "Please list at least one tag."),
 });
 
+type ProjectFormValues = z.infer<typeof projectFormSchema>;
+
 const projectCategories = ["All", "AI", "Web Dev", "Mobile", "Data Science", "Cybersecurity"];
 
 const isValidImageUrl = (url: string) => {
@@ -622,7 +626,7 @@ const isValidImageUrl = (url: string) => {
 }
 
 function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => void, onOpenChange: (open: boolean) => void, author: string }) {
-  const form = useForm<z.infer<typeof projectFormSchema>>({
+  const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectFormSchema),
     defaultValues: {
       title: "",
@@ -634,7 +638,7 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
     },
   });
 
-  const handleSubmit = async (values: z.infer<typeof projectFormSchema>>) => {
+  const handleSubmit = async (values: ProjectFormValues) => {
     try {
       let imageUrl = values.image;
       if (!imageUrl || !isValidImageUrl(imageUrl)) {
@@ -677,7 +681,7 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
           <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/600x400.png" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="tags" render={({ field }) => (
-          <FormItem><FormLabel>Tags (comma-separated)</FormLabel><FormControl><Input placeholder="Python, NLTK, Flask" {...field} /></FormControl><FormMessage /></FormMessage /></FormItem>
+          <FormItem><FormLabel>Tags (comma-separated)</FormLabel><FormControl><Input placeholder="Python, NLTK, Flask" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <Button type="submit" className="w-full">Add Project</Button>
       </form>
@@ -821,6 +825,8 @@ const eventFormSchema = z.object({
   type: z.enum(["event", "deadline", "announcement"]),
 });
 
+type EventFormValues = z.infer<typeof eventFormSchema>;
+
 const eventConfig: { [key: string]: { icon: React.ReactNode; variant: BadgeProps['variant'] } } = {
   event: { icon: <Calendar className="h-4 w-4" />, variant: 'default' },
   deadline: { icon: <Bell className="h-4 w-4" />, variant: 'destructive' },
@@ -830,12 +836,12 @@ const eventConfig: { [key: string]: { icon: React.ReactNode; variant: BadgeProps
 const ADMIN_EMAIL_EVENTS = "tingiya730@gmail.com";
 
 function EventForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange: (open: boolean) => void }) {
-  const form = useForm<z.infer<typeof eventFormSchema>>({
+  const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: { title: "", description: "", date: "", type: "event" },
   });
 
-  const handleSubmit = async (values: z.infer<typeof eventFormSchema>>) => {
+  const handleSubmit = async (values: EventFormValues) => {
     try {
       await addDoc(collection(db, "events"), values);
       onSave();
@@ -976,6 +982,8 @@ const resourceFormSchema = z.object({
   href: z.string().min(1, "Please enter a URL or file path."),
 });
 
+type ResourceFormValues = z.infer<typeof resourceFormSchema>;
+
 const resourceCategories = [
   "Learning Platform",
   "Tools You Must Try",
@@ -986,12 +994,12 @@ const resourceCategories = [
 const ADMIN_EMAIL_RESOURCES = "tingiya730@gmail.com";
 
 function ResourceForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange: (open: boolean) => void }) {
-  const form = useForm<z.infer<typeof resourceFormSchema>>({
+  const form = useForm<ResourceFormValues>({
     resolver: zodResolver(resourceFormSchema),
     defaultValues: { title: "", category: "", type: "link", href: "" },
   });
 
-  const handleSubmit = async (values: z.infer<typeof resourceFormSchema>>) => {
+  const handleSubmit = async (values: ResourceFormValues) => {
     try {
       await addDoc(collection(db, "resources"), values);
       onSave();
