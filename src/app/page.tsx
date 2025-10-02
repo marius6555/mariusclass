@@ -2,13 +2,13 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { GraduationCap, ExternalLink, PlusCircle, Mail, Briefcase, Trash2, Edit, Camera, Eye, Github, Linkedin, Instagram, Facebook, Download, Link as LinkIcon, Bell, Calendar, Milestone } from "lucide-react";
+import { GraduationCap, ExternalLink, PlusCircle, Mail, Briefcase, Trash2, Edit, Eye, Github, Linkedin, Instagram, Facebook, Download, Link as LinkIcon, Bell, Calendar, Milestone } from "lucide-react";
 import { db, storage, auth } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy, Timestamp, updateDoc, setDoc, addDoc, where, deleteDoc } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";

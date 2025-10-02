@@ -12,6 +12,8 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { errorEmitter } from '@/lib/error-emitter';
+import { FirestorePermissionError } from '@/lib/errors';
 
 type Notification = {
   id: string;
@@ -50,8 +52,13 @@ export function Notifications() {
       } as Notification));
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.read).length);
-    }, (error) => {
-        console.error("Error fetching notifications:", error);
+    }, 
+    async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: 'notifications',
+          operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     });
 
     return () => unsubscribe();
