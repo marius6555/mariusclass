@@ -10,6 +10,8 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp, limi
 import { Badge } from './ui/badge';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 type Notification = {
   id: string;
@@ -23,8 +25,23 @@ type Notification = {
 export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user);
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
     const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(10));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const notifs = querySnapshot.docs.map(doc => ({
@@ -33,23 +50,47 @@ export function Notifications() {
       } as Notification));
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.read).length);
+    }, (error) => {
+        console.error("Error fetching notifications:", error);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isLoggedIn]);
 
   const handleMarkAsRead = async (id: string) => {
+    if (!isLoggedIn) return;
     const notifRef = doc(db, "notifications", id);
     await updateDoc(notifRef, { read: true });
   };
   
   const handleMarkAllAsRead = async () => {
+    if (!isLoggedIn) return;
     notifications.forEach(async (n) => {
       if (!n.read) {
         await handleMarkAsRead(n.id);
       }
     })
   }
+
+  if (!isLoggedIn) {
+      return (
+         <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="outline" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                <span className="sr-only">Open notifications</span>
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0">
+                <div className="text-center text-muted-foreground p-8">
+                    <Zap className="mx-auto h-8 w-8 mb-2"/>
+                    <p>Please log in to see notifications.</p>
+                </div>
+            </PopoverContent>
+         </Popover>
+      );
+  }
+
 
   return (
     <Popover>
