@@ -45,21 +45,23 @@ export function Notifications() {
     }
 
     const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(10));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const notifs = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Notification));
-      setNotifications(notifs);
-      setUnreadCount(notifs.filter(n => !n.read).length);
-    }, 
-    async (serverError) => {
+    const unsubscribe = onSnapshot(q, 
+      (querySnapshot) => {
+        const notifs = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as Notification));
+        setNotifications(notifs);
+        setUnreadCount(notifs.filter(n => !n.read).length);
+      }, 
+      async (serverError) => {
         const permissionError = new FirestorePermissionError({
           path: 'notifications',
           operation: 'list',
         });
         errorEmitter.emit('permission-error', permissionError);
-    });
+      }
+    );
 
     return () => unsubscribe();
   }, [isLoggedIn]);
@@ -67,7 +69,14 @@ export function Notifications() {
   const handleMarkAsRead = async (id: string) => {
     if (!isLoggedIn) return;
     const notifRef = doc(db, "notifications", id);
-    await updateDoc(notifRef, { read: true });
+    updateDoc(notifRef, { read: true }).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: notifRef.path,
+            operation: 'update',
+            requestResourceData: { read: true }
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
   };
   
   const handleMarkAllAsRead = async () => {
