@@ -69,7 +69,13 @@ export default function AuthPage() {
       router.push('/');
 
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Sign Up Failed", description: error.message });
+      let errorMessage = "An unknown error occurred. Please try again.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "This email is already in use. Please try logging in.";
+      } else {
+        errorMessage = error.message;
+      }
+      toast({ variant: "destructive", title: "Sign Up Failed", description: errorMessage });
       console.error("Sign up error:", error);
     }
   };
