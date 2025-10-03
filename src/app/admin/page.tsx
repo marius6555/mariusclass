@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Mail, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/lib/error-emitter';
+import { FirestorePermissionError } from '@/lib/errors';
 
 
 type Message = {
@@ -37,21 +39,26 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(true);
 
     const fetchAdminData = async () => {
-        // Fetch Messages
-        const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
-        const messagesSnapshot = await getDocs(messagesQuery);
-        const messagesList = messagesSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt
-        } as Message));
-        setMessages(messagesList);
+        try {
+            // Fetch Messages
+            const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+            const messagesSnapshot = await getDocs(messagesQuery);
+            const messagesList = messagesSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt
+            } as Message));
+            setMessages(messagesList);
 
-        // Fetch Students
-        const studentsQuery = query(collection(db, "students"), orderBy("name"));
-        const studentsSnapshot = await getDocs(studentsQuery);
-        const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
-        setStudents(studentsList);
+            // Fetch Students
+            const studentsQuery = query(collection(db, "students"), orderBy("name"));
+            const studentsSnapshot = await getDocs(studentsQuery);
+            const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+            setStudents(studentsList);
+        } catch(e) {
+            const permissionError = new FirestorePermissionError({ path: 'messages', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+        }
     };
     
     useEffect(() => {
@@ -74,22 +81,18 @@ export default function AdminPage() {
     }, [router]);
 
     const handleToggleRead = async (message: Message) => {
-        try {
-            const messageRef = doc(db, "messages", message.id);
-            await updateDoc(messageRef, { read: !message.read });
-            await fetchAdminData(); // Re-fetch to update UI
+        const messageRef = doc(db, "messages", message.id);
+        const newData = { read: !message.read };
+        updateDoc(messageRef, newData).then(() => {
+            fetchAdminData(); // Re-fetch to update UI
             toast({
                 title: "Status Updated",
                 description: `Message marked as ${!message.read ? "read" : "unread"}.`
             });
-        } catch (error) {
-            console.error("Error updating message status:", error);
-            toast({
-                variant: "destructive",
-                title: "Update Failed",
-                description: "Could not update the message status.",
-            });
-        }
+        }).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: messageRef.path, operation: 'update', requestResourceData: newData });
+            errorEmitter.emit('permission-error', permissionError);
+        });
     };
 
     if (loading) {

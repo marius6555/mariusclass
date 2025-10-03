@@ -83,7 +83,15 @@ export function Notifications() {
     if (!isLoggedIn) return;
     notifications.forEach(async (n) => {
       if (!n.read) {
-        await handleMarkAsRead(n.id);
+        const notifRef = doc(db, "notifications", n.id);
+        updateDoc(notifRef, { read: true }).catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: notifRef.path,
+                operation: 'update',
+                requestResourceData: { read: true }
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
       }
     })
   }
@@ -138,8 +146,9 @@ export function Notifications() {
                         <Link href={n.link || '#'} passHref>
                             <a className="block hover:bg-muted/50 -m-4 p-4" onClick={() => handleMarkAsRead(n.id)}>
                                 <p className="text-sm mb-1">{n.message}</p>
+
                                 <p className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(n.createdAt.toDate(), { addSuffix: true })}
+                                    {n.createdAt ? formatDistanceToNow(n.createdAt.toDate(), { addSuffix: true }) : 'just now'}
                                 </p>
                             </a>
                         </Link>

@@ -29,6 +29,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/lib/error-emitter';
+import { FirestorePermissionError } from '@/lib/errors';
 
 
 // Common types
@@ -230,9 +232,10 @@ function StudentsSection() {
       const querySnapshot = await getDocs(collection(db, "students"));
       const studentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
       setStudents(studentsList);
-    } catch (e) {
-      console.error("Error fetching students: ", e);
+    } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: "Could not fetch student profiles." });
+      const permissionError = new FirestorePermissionError({ path: 'students', operation: 'list' });
+      errorEmitter.emit('permission-error', permissionError);
     }
   };
   
@@ -251,7 +254,7 @@ function StudentsSection() {
 
   const onSave = async (data: any) => {
     if (!currentUser?.uid) return;
-    
+  
     let studentToUpdate = students.find(s => s.uid === currentUser.uid);
     const isNew = !studentToUpdate;
   
@@ -259,35 +262,37 @@ function StudentsSection() {
       ...data,
       uid: currentUser.uid,
       email: currentUser.email,
-      initials: data.name.split(" ").map((n:string) => n[0]).join(""),
+      initials: data.name.split(" ").map((n: string) => n[0]).join(""),
     };
   
-    try {
-      let updatedStudentDoc: Omit<Student, 'id'>;
-      if (isNew) {
-        const docRef = await addDoc(collection(db, "students"), studentData);
-        updatedStudentDoc = { ...studentData };
-        toast({ title: "Profile Created!", description: "Your student profile is now live." });
-      } else if(studentToUpdate?.id) {
+    if (isNew) {
+        const docRef = collection(db, "students");
+        addDoc(docRef, studentData).then(() => {
+            const updatedStudent: Student = { ...currentUser, ...studentData, id: docRef.id };
+            setCurrentUser(updatedStudent);
+            localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
+            toast({ title: "Profile Created!", description: "Your student profile is now live." });
+            fetchStudents();
+            setIsFormOpen(false);
+            setEditingStudent(null);
+        }).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: 'students', operation: 'create', requestResourceData: studentData });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+    } else if (studentToUpdate?.id) {
         const studentRef = doc(db, "students", studentToUpdate.id);
-        await updateDoc(studentRef, { ...studentData });
-        updatedStudentDoc = { ...studentToUpdate, ...studentData };
-        toast({ title: "Profile Updated!", description: "Your changes have been saved." });
-      } else {
-        throw new Error("Could not find student profile to update.");
-      }
-
-      const updatedStudent: Student = { ...currentUser, ...updatedStudentDoc };
-
-      setCurrentUser(updatedStudent);
-      localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
-      
-      await fetchStudents(); 
-      setIsFormOpen(false);
-      setEditingStudent(null);
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Save Failed", description: error.message });
-      console.error("Save error:", error);
+        updateDoc(studentRef, studentData).then(() => {
+            const updatedStudent: Student = { ...currentUser, ...studentData };
+            setCurrentUser(updatedStudent);
+            localStorage.setItem("currentUser", JSON.stringify(updatedStudent));
+            toast({ title: "Profile Updated!", description: "Your changes have been saved." });
+            fetchStudents();
+            setIsFormOpen(false);
+            setEditingStudent(null);
+        }).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: studentRef.path, operation: 'update', requestResourceData: studentData });
+            errorEmitter.emit('permission-error', permissionError);
+        });
     }
   };
 
@@ -306,7 +311,13 @@ function StudentsSection() {
       const credential = EmailAuthProvider.credential(auth.currentUser.email!, password);
       await reauthenticateWithCredential(auth.currentUser, credential);
 
-      await deleteDoc(doc(db, "students", currentUser.id));
+      const studentRef = doc(db, "students", currentUser.id);
+      deleteDoc(studentRef).catch(serverError => {
+          const permissionError = new FirestorePermissionError({ path: studentRef.path, operation: 'delete' });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError; // Re-throw to stop execution flow
+      });
+
       await deleteUser(auth.currentUser);
 
       localStorage.removeItem("currentUser");
@@ -315,8 +326,9 @@ function StudentsSection() {
       setStudents(students.filter(s => s.id !== currentUser.id));
       router.push('/');
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Deletion Failed", description: error.message });
-      console.error("Deletion error:", error);
+      if (!(error instanceof FirestorePermissionError)) {
+          toast({ variant: "destructive", title: "Deletion Failed", description: error.message });
+      }
     }
   };
 
@@ -338,8 +350,8 @@ function StudentsSection() {
       const projectsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setStudentProjects(projectsList);
     } catch (error) {
-      console.error("Error fetching student projects:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not fetch student projects." });
+        const permissionError = new FirestorePermissionError({ path: 'projects', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
     }
   };
   
@@ -604,7 +616,8 @@ function ProjectsSection() {
       const projectsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setProjects(projectsList);
     } catch (e) {
-      console.error("Error fetching projects: ", e);
+        const permissionError = new FirestorePermissionError({ path: 'projects', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
     }
   };
 
@@ -621,33 +634,43 @@ function ProjectsSection() {
   }, []);
 
   const onSave = async (data: any) => {
-    try {
-        let imageUrl = "https://placehold.co/600x400.png";
-        let projectDocRefForId = doc(collection(db, "projects")); // Create a ref to get an ID first
+    let imageUrl = "https://placehold.co/600x400.png";
+    const projectDocRef = doc(collection(db, "projects"));
 
+    try {
         if (data.image && data.image.startsWith('data:image')) {
-            const storageRef = ref(storage, `projects/${projectDocRefForId.id}`);
+            const storageRef = ref(storage, `projects/${projectDocRef.id}`);
             await uploadString(storageRef, data.image, 'data_url');
             imageUrl = await getDownloadURL(storageRef);
         }
         
-        const finalProjectData = { ...data, image: imageUrl, id: projectDocRefForId.id };
-        await setDoc(projectDocRefForId, finalProjectData);
-      
-        await addDoc(collection(db, "notifications"), {
+        const finalProjectData = { ...data, image: imageUrl, id: projectDocRef.id };
+        
+        setDoc(projectDocRef, finalProjectData).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'create', requestResourceData: finalProjectData });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        });
+
+        const notificationData = {
             message: `New project added: "${data.title}" by ${data.author}`,
             type: 'new_project',
-            link: `/projects#${projectDocRefForId.id}`,
+            link: `/projects#${projectDocRef.id}`,
             createdAt: serverTimestamp(),
             read: false,
+        };
+        addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+            errorEmitter.emit('permission-error', permissionError);
         });
 
         toast({ title: "Project Added!", description: "Your project has been added to the hub." });
         fetchProjects();
         setIsDialogOpen(false);
     } catch (error) {
-      console.error("Error saving project:", error);
-      toast({ variant: "destructive", title: "Save failed", description: "There was an issue saving your project."});
+        if (!(error instanceof FirestorePermissionError)) {
+            toast({ variant: "destructive", title: "Save failed", description: "There was an issue saving your project."});
+        }
     }
   };
   
@@ -764,19 +787,31 @@ function EventForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange:
 
   const handleSubmit = async (values: EventFormValues) => {
     try {
-      const eventDocRef = await addDoc(collection(db, "events"), values);
-      await addDoc(collection(db, "notifications"), {
+      const eventDocRef = await addDoc(collection(db, "events"), values).catch(serverError => {
+          const permissionError = new FirestorePermissionError({ path: 'events', operation: 'create', requestResourceData: values });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
+      });
+
+      const notificationData = {
         message: `New ${values.type}: ${values.title}`,
         type: 'new_event',
         link: `/events#${eventDocRef.id}`,
         createdAt: serverTimestamp(),
         read: false,
+      };
+      addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
+          const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+          errorEmitter.emit('permission-error', permissionError);
       });
+
       onSave();
       onOpenChange(false);
       form.reset();
     } catch (error) {
-      console.error("Error saving event: ", error);
+       if (!(error instanceof FirestorePermissionError)) {
+          console.error("Error saving event: ", error);
+       }
     }
   };
 
@@ -824,7 +859,8 @@ function EventsSection() {
       const eventsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
       setEvents(eventsList);
     } catch (e) {
-      console.error("Error fetching events: ", e);
+      const permissionError = new FirestorePermissionError({ path: 'events', operation: 'list' });
+      errorEmitter.emit('permission-error', permissionError);
     }
   };
 
@@ -929,19 +965,31 @@ function ResourceForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChan
 
   const handleSubmit = async (values: ResourceFormValues) => {
     try {
-      const resourceDocRef = await addDoc(collection(db, "resources"), values);
-      await addDoc(collection(db, "notifications"), {
+      const resourceDocRef = await addDoc(collection(db, "resources"), values).catch(serverError => {
+        const permissionError = new FirestorePermissionError({ path: 'resources', operation: 'create', requestResourceData: values });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
+      });
+      
+      const notificationData = {
         message: `New resource added in ${values.category}: ${values.title}`,
         type: 'new_resource',
         link: `/resources#${resourceDocRef.id}`,
         createdAt: serverTimestamp(),
         read: false,
+      };
+      addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
+        const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+        errorEmitter.emit('permission-error', permissionError);
       });
+
       onSave();
       onOpenChange(false);
       form.reset();
     } catch (error) {
-      console.error("Error saving resource: ", error);
+      if (!(error instanceof FirestorePermissionError)) {
+        console.error("Error saving resource: ", error);
+      }
     }
   };
 
@@ -1006,7 +1054,8 @@ function ResourcesSection() {
 
       setResources(grouped);
     } catch (e) {
-      console.error("Error fetching resources: ", e);
+      const permissionError = new FirestorePermissionError({ path: 'resources', operation: 'list' });
+      errorEmitter.emit('permission-error', permissionError);
     }
   };
 
@@ -1117,7 +1166,8 @@ function ContactSection() {
           setAdmin({ id: adminDoc.id, ...adminDoc.data() } as Student);
         }
       } catch (error) {
-        console.error("Error fetching admin details:", error);
+        const permissionError = new FirestorePermissionError({ path: 'students', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
       } finally {
         setLoading(false);
       }
@@ -1141,6 +1191,10 @@ function ContactSection() {
         ...values,
         createdAt: serverTimestamp(),
         read: false,
+      }).catch(serverError => {
+        const permissionError = new FirestorePermissionError({ path: 'messages', operation: 'create', requestResourceData: values });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
       });
       toast({
         title: "Message Sent!",
@@ -1148,12 +1202,13 @@ function ContactSection() {
       });
       form.reset();
     } catch (error) {
-       console.error("Error sending message:", error);
-       toast({
-        variant: "destructive",
-        title: "Sending Failed",
-        description: "There was a problem sending your message. Please try again.",
-      });
+       if (!(error instanceof FirestorePermissionError)) {
+          toast({
+            variant: "destructive",
+            title: "Sending Failed",
+            description: "There was a problem sending your message. Please try again.",
+          });
+       }
     }
   }
 
