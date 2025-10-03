@@ -99,7 +99,14 @@ export default function AuthPage() {
            router.push('/admin');
            return;
         }
-        throw new Error("No student profile found for this user.");
+        
+        // Handle regular users with no profile
+        toast({
+          variant: "destructive",
+          title: "Profile Not Found",
+          description: "No student profile found. Please sign up to create one.",
+        });
+        return;
       }
       
       const studentDoc = querySnapshot.docs[0];
