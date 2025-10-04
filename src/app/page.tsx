@@ -663,9 +663,8 @@ function ProjectsSection() {
         });
         toast({ title: "Project Updated!", description: "Your project has been successfully updated." });
       } else {
-        const projectDocRef = doc(collection(db, "projects"));
-        await setDoc(projectDocRef, { ...finalProjectData, id: projectDocRef.id }).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'create', requestResourceData: finalProjectData });
+        const projectDocRef = await addDoc(collection(db, "projects"), finalProjectData).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: 'projects', operation: 'create', requestResourceData: finalProjectData });
             errorEmitter.emit('permission-error', permissionError);
             throw permissionError;
         });
@@ -734,7 +733,7 @@ function ProjectsSection() {
           description="Discover innovative projects by students."
         />
         <div className="flex justify-end my-6">
-            <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                  <Button onClick={handleAddClick} disabled={!currentUser}>
                     <PlusCircle className="mr-2"/> Add Project
@@ -748,7 +747,7 @@ function ProjectsSection() {
                     <ProjectForm 
                         project={editingProject}
                         onSave={onSave} 
-                        onOpenChange={handleCloseDialog} 
+                        onOpenChange={setIsDialogOpen} 
                         author={currentUser.name} 
                     />
                 ) : (
@@ -1013,7 +1012,7 @@ function EventsSection() {
         />
         {isAdmin && (
           <div className="flex justify-end my-6">
-              <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button onClick={handleAddClick}><PlusCircle className="mr-2"/> Add Event</Button>
                 </DialogTrigger>
@@ -1021,7 +1020,7 @@ function EventsSection() {
                   <DialogHeader>
                     <DialogTitle>{editingEvent ? 'Edit Event' : 'Add a New Event'}</DialogTitle>
                   </DialogHeader>
-                  <EventForm event={editingEvent} onSave={onSave} onOpenChange={handleCloseDialog} />
+                  <EventForm event={editingEvent} onSave={onSave} onOpenChange={setIsDialogOpen} />
                 </DialogContent>
               </Dialog>
           </div>
