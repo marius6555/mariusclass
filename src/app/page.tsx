@@ -185,7 +185,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
           <FormItem><FormLabel className="flex items-center gap-2"><Instagram className="w-4 h-4"/> Instagram</FormLabel><FormControl><Input placeholder="https://instagram.com/your-username" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="facebook" render={({ field }) => (
-          <FormItem><FormLabel className="flex items-center gap-2"><Facebook className="w-4 h-4"/> Facebook</FormLabel><FormControl><Input placeholder="https://facebook.com/your-profile" {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel className="flex items-center gap-2"><Facebook className="w-4 h-4"/> Facebook</FormLabel><FormControl><Input placeholder="https://facebook.com/your-profile" {...field} /></FormControl></FormItem>
         )} />
         <FormField control={form.control} name="whatsapp" render={({ field }) => (
           <FormItem>
@@ -545,15 +545,15 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project: Proje
       tags: project?.tags?.join(', ') || "",
     },
   });
-  const [image, setImage] = useState<{dataUrl: string | null, name: string | null}>({ dataUrl: project?.image || null, name: null });
+  const [imageName, setImageName] = useState<string | null>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImage({ dataUrl: reader.result as string, name: file.name });
-        form.setValue("image", reader.result);
+        setImageName(file.name);
+        form.setValue("image", reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -569,7 +569,7 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project: Proje
       tags: values.tags.split(",").map(t => t.trim()),
       hint: 'abstract',
       author: project?.author || author,
-      image: values.image, // Pass the new image data or null
+      image: form.getValues("image"),
     };
 
     onSave(projectData, project?.id);
@@ -596,7 +596,7 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project: Proje
             <FormControl>
               <Input type="file" accept="image/*" onChange={handleImageChange} />
             </FormControl>
-            {image.name && <p className="text-sm text-muted-foreground mt-2">{image.name}</p>}
+            {imageName && <p className="text-sm text-muted-foreground mt-2">{imageName}</p>}
             <FormMessage />
         </FormItem>
         <FormField control={form.control} name="tags" render={({ field }) => (
@@ -640,64 +640,63 @@ function ProjectsSection() {
 
   const onSave = async (data: any, projectId?: string) => {
     try {
-      const isEditing = !!projectId;
-      let imageUrl = data.image || "https://placehold.co/600x400.png";
-      let projectDocRef;
-  
-      if (isEditing) {
-        projectDocRef = doc(db, "projects", projectId!);
-      } else {
-        projectDocRef = doc(collection(db, "projects"));
-      }
-  
-      // If there's a new image file, upload it
-      if (data.image && data.image.startsWith('data:image')) {
-        const storageRef = ref(storage, `projects/${projectDocRef.id}`);
-        await uploadString(storageRef, data.image, 'data_url');
-        imageUrl = await getDownloadURL(storageRef);
-      } else if (isEditing) {
-        const existingProject = projects.find(p => p.id === projectId);
-        imageUrl = existingProject?.image || imageUrl;
-      }
-  
-      const finalProjectData = { ...data, image: imageUrl };
-  
-      if (isEditing) {
-        await updateDoc(projectDocRef, finalProjectData).catch(serverError => {
-          const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'update', requestResourceData: finalProjectData });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-        });
-        toast({ title: "Project Updated!", description: "Your project has been successfully updated." });
-      } else {
-        await setDoc(projectDocRef, finalProjectData).catch(serverError => {
-          const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'create', requestResourceData: finalProjectData });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-        });
-  
-        const notificationData = {
-          message: `New project added: "${data.title}" by ${data.author}`,
-          type: 'new_project',
-          link: `/projects#${projectDocRef.id}`,
-          createdAt: serverTimestamp(),
-          read: false,
-        };
-        addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
-          const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
-          errorEmitter.emit('permission-error', permissionError);
-        });
-        toast({ title: "Project Added!", description: "Your project has been added to the hub." });
-      }
-      
-      fetchProjects();
-      handleCloseDialog();
+        const isEditing = !!projectId;
+        let imageUrl = data.image;
+        let projectDocRef;
+
+        if (isEditing) {
+            projectDocRef = doc(db, "projects", projectId!);
+        } else {
+            projectDocRef = doc(collection(db, "projects"));
+        }
+
+        if (data.image && data.image.startsWith('data:image')) {
+            const storageRef = ref(storage, `projects/${projectDocRef.id}`);
+            await uploadString(storageRef, data.image, 'data_url');
+            imageUrl = await getDownloadURL(storageRef);
+        } else if (isEditing) {
+            const existingProject = projects.find(p => p.id === projectId);
+            imageUrl = existingProject?.image;
+        }
+
+        const finalProjectData = { ...data, image: imageUrl || "https://placehold.co/600x400.png" };
+
+        if (isEditing) {
+            await updateDoc(projectDocRef, finalProjectData).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'update', requestResourceData: finalProjectData });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError;
+            });
+            toast({ title: "Project Updated!", description: "Your project has been successfully updated." });
+        } else {
+             await setDoc(projectDocRef, finalProjectData).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'create', requestResourceData: finalProjectData });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError;
+            });
+
+            const notificationData = {
+                message: `New project added: "${data.title}" by ${data.author}`,
+                type: 'new_project',
+                link: `/projects#${projectDocRef.id}`,
+                createdAt: serverTimestamp(),
+                read: false,
+            };
+            addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+            toast({ title: "Project Added!", description: "Your project has been added to the hub." });
+        }
+
+        fetchProjects();
+        handleCloseDialog();
     } catch (error) {
         if (!(error instanceof FirestorePermissionError)) {
-            toast({ variant: "destructive", title: "Save failed", description: "There was an issue saving your project."});
+            toast({ variant: "destructive", title: "Save failed", description: "There was an issue saving your project." });
         }
     }
-  };
+};
   
   const handleDeleteProject = async (projectId: string) => {
     try {
@@ -949,8 +948,9 @@ function EventsSection() {
             });
             toast({ title: "Event Updated", description: "The event has been successfully updated." });
         } else {
-            const eventDocRef = await addDoc(collection(db, "events"), values).catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: 'events', operation: 'create', requestResourceData: values });
+            const eventDocRef = doc(collection(db, "events"));
+            await setDoc(eventDocRef, values).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: eventDocRef.path, operation: 'create', requestResourceData: values });
                 errorEmitter.emit('permission-error', permissionError);
                 throw permissionError;
             });
