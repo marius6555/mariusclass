@@ -545,14 +545,14 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project: Proje
       tags: project?.tags?.join(', ') || "",
     },
   });
-  const [preview, setPreview] = useState<string | null>(project?.image || null);
+  const [image, setImage] = useState<{dataUrl: string | null, name: string | null}>({ dataUrl: project?.image || null, name: null });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreview(reader.result as string);
+        setImage({ dataUrl: reader.result as string, name: file.name });
         form.setValue("image", reader.result);
       };
       reader.readAsDataURL(file);
@@ -596,7 +596,7 @@ function ProjectForm({ project, onSave, onOpenChange, author }: { project: Proje
             <FormControl>
               <Input type="file" accept="image/*" onChange={handleImageChange} />
             </FormControl>
-            {preview && <img src={preview} alt="Project preview" className="mt-4 rounded-md object-cover w-full h-auto" />}
+            {image.name && <p className="text-sm text-muted-foreground mt-2">{image.name}</p>}
             <FormMessage />
         </FormItem>
         <FormField control={form.control} name="tags" render={({ field }) => (
