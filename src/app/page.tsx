@@ -1102,40 +1102,20 @@ const resourceCategories = [
   "Upcoming Tech Challenges",
 ];
 
-function ResourceForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange: (open: boolean) => void }) {
+function ResourceForm({ resource, onSave, onOpenChange }: { resource?: Resource | null, onSave: (values: ResourceFormValues, resourceId?: string) => void, onOpenChange: (open: boolean) => void }) {
   const form = useForm<ResourceFormValues>({
     resolver: zodResolver(resourceFormSchema),
-    defaultValues: { title: "", category: "", type: "link", href: "" },
+    defaultValues: { 
+        title: resource?.title || "", 
+        category: resource?.category || "", 
+        type: resource?.type || "link", 
+        href: resource?.href || "" 
+    },
   });
 
   const handleSubmit = async (values: ResourceFormValues) => {
-    try {
-      const resourceDocRef = await addDoc(collection(db, "resources"), values).catch(serverError => {
-        const permissionError = new FirestorePermissionError({ path: 'resources', operation: 'create', requestResourceData: values });
-        errorEmitter.emit('permission-error', permissionError);
-        throw permissionError;
-      });
-      
-      const notificationData = {
-        message: `New resource added in ${values.category}: ${values.title}`,
-        type: 'new_resource',
-        link: `/resources#${resourceDocRef.id}`,
-        createdAt: serverTimestamp(),
-        read: false,
-      };
-      addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
-        const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
-        errorEmitter.emit('permission-error', permissionError);
-      });
-
-      onSave();
-      onOpenChange(false);
-      form.reset();
-    } catch (error) {
-      if (!(error instanceof FirestorePermissionError)) {
-        console.error("Error saving resource: ", error);
-      }
-    }
+    onSave(values, resource?.id);
+    onOpenChange(false);
   };
 
   return (
@@ -1170,7 +1150,7 @@ function ResourceForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChan
         <FormField control={form.control} name="href" render={({ field }) => (
           <FormItem><FormLabel>URL / Path</FormLabel><FormControl><Input placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
-        <Button type="submit" className="w-full">Add Resource</Button>
+        <Button type="submit" className="w-full">{resource ? 'Save Changes' : 'Add Resource'}</Button>
       </form>
     </Form>
   );
@@ -1178,6 +1158,7 @@ function ResourceForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChan
 
 function ResourcesSection() {
   const [resources, setResources] = useState<GroupedResources>({});
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
@@ -1216,12 +1197,81 @@ function ResourcesSection() {
     }
   }, []);
   
-  const onSave = () => {
-    fetchResources();
-    setIsDialogOpen(false);
-    toast({ title: "Resource Added!", description: "The new resource has been added." });
+  const onSave = async (values: ResourceFormValues, resourceId?: string) => {
+    const isEditing = !!resourceId;
+    try {
+      if (isEditing) {
+        const resourceRef = doc(db, "resources", resourceId!);
+        await updateDoc(resourceRef, values).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: resourceRef.path, operation: 'update', requestResourceData: values });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        });
+        toast({ title: "Resource Updated", description: "The resource has been successfully updated." });
+      } else {
+        const resourceDocRef = await addDoc(collection(db, "resources"), values).catch(serverError => {
+          const permissionError = new FirestorePermissionError({ path: 'resources', operation: 'create', requestResourceData: values });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
+        });
+        
+        const notificationData = {
+          message: `New resource added in ${values.category}: ${values.title}`,
+          type: 'new_resource',
+          link: `/resources#${resourceDocRef.id}`,
+          createdAt: serverTimestamp(),
+          read: false,
+        };
+        addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
+          const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+          errorEmitter.emit('permission-error', permissionError);
+        });
+
+        toast({ title: "Resource Added!", description: "The new resource has been added." });
+      }
+
+      fetchResources();
+      handleCloseDialog();
+    } catch (error) {
+      if (!(error instanceof FirestorePermissionError)) {
+        console.error("Error saving resource: ", error);
+        toast({ variant: 'destructive', title: 'Save Failed', description: 'There was an issue saving the resource.'});
+      }
+    }
+  };
+
+  const handleDeleteResource = async (resourceId: string) => {
+    try {
+        const resourceRef = doc(db, "resources", resourceId);
+        await deleteDoc(resourceRef).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: resourceRef.path, operation: 'delete' });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        });
+        toast({ title: "Resource Deleted", description: "The resource has been removed." });
+        fetchResources();
+    } catch(error) {
+        if (!(error instanceof FirestorePermissionError)) {
+            toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the resource." });
+        }
+    }
   };
   
+  const handleAddClick = () => {
+    setEditingResource(null);
+    setIsDialogOpen(true);
+  };
+  
+  const handleEditClick = (resource: Resource) => {
+    setEditingResource(resource);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setEditingResource(null);
+    setIsDialogOpen(false);
+  };
+
   const isAdmin = currentUser?.email === ADMIN_EMAIL;
   
   return (
@@ -1234,20 +1284,20 @@ function ResourcesSection() {
           <div className="flex justify-end my-6">
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button><PlusCircle className="mr-2"/> Add Resource</Button>
+                  <Button onClick={handleAddClick}><PlusCircle className="mr-2"/> Add Resource</Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add a New Resource</DialogTitle>
+                    <DialogTitle>{editingResource ? 'Edit Resource' : 'Add a New Resource'}</DialogTitle>
                   </DialogHeader>
-                  <ResourceForm onSave={onSave} onOpenChange={setIsDialogOpen} />
+                  <ResourceForm resource={editingResource} onSave={onSave} onOpenChange={handleCloseDialog} />
                 </DialogContent>
               </Dialog>
           </div>
         )}
         <Accordion type="single" collapsible defaultValue={Object.keys(resources)[0]} className="w-full space-y-4 mt-6">
           {Object.entries(resources).map(([category, items]) => (
-            <AccordionItem value={category} key={category} id={items[0].id} className="border-none">
+            <AccordionItem value={category} key={category} id={items.length > 0 ? items[0].id : category} className="border-none">
               <Card>
                 <AccordionTrigger className="p-6 font-headline text-xl hover:no-underline">
                   {category}
@@ -1256,14 +1306,42 @@ function ResourcesSection() {
                   <div className="px-6 pb-6">
                     <ul className="space-y-4">
                       {items.map((item) => (
-                        <li key={item.id} className="flex items-center justify-between p-4 rounded-lg border bg-background">
-                          <span className="font-medium">{item.title}</span>
-                           <Link href={item.href} target="_blank">
-                             <Button variant="ghost" size="icon">
-                                   {item.type === 'file' ? <Download /> : <LinkIcon />}
-                                   <span className="sr-only">{item.type === 'file' ? 'Download' : 'Open link'}</span>
-                             </Button>
-                           </Link>
+                        <li key={item.id} className="flex items-center justify-between p-4 rounded-lg border bg-background group">
+                          <div className="flex items-center gap-4">
+                            <span className="font-medium">{item.title}</span>
+                            <Link href={item.href} target="_blank">
+                              <Button variant="ghost" size="icon">
+                                    {item.type === 'file' ? <Download /> : <LinkIcon />}
+                                    <span className="sr-only">{item.type === 'file' ? 'Download' : 'Open link'}</span>
+                              </Button>
+                            </Link>
+                          </div>
+                          {isAdmin && (
+                            <div className="flex gap-2">
+                                <Button size="icon" variant="outline" onClick={() => handleEditClick(item)}>
+                                    <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button size="icon" variant="destructive">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete Resource?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action will permanently delete this resource.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteResource(item.id)}>Continue</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -1456,3 +1534,5 @@ function ContactSection() {
   );
 }
 
+
+    
