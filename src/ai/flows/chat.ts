@@ -6,8 +6,7 @@ import { z } from 'zod';
 import { ChatHistory, chatSchema } from '../schemas/chat';
 
 export async function chat(history: ChatHistory) {
-  const llm = ai.model('googleai/gemini-pro');
-
+  
   const prompt = `You are a helpful assistant for the ClassHub Central application.
     The following is the chat history between you and the user.
     Take the following history and continue the conversation.
@@ -18,9 +17,11 @@ export async function chat(history: ChatHistory) {
       .join('\n')}}
     `;
 
-  const result = await llm.generate({
+  const result = await ai.generate({
+    model: 'googleai/gemini-pro',
     prompt,
   });
 
   return result.text;
 }
+
