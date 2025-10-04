@@ -39,26 +39,29 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(true);
 
     const fetchAdminData = async () => {
-        try {
-            // Fetch Messages
-            const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
-            const messagesSnapshot = await getDocs(messagesQuery);
+        // Fetch Messages
+        const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+        getDocs(messagesQuery).then(messagesSnapshot => {
             const messagesList = messagesSnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
                 createdAt: doc.data().createdAt
             } as Message));
             setMessages(messagesList);
-
-            // Fetch Students
-            const studentsQuery = query(collection(db, "students"), orderBy("name"));
-            const studentsSnapshot = await getDocs(studentsQuery);
-            const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
-            setStudents(studentsList);
-        } catch(e) {
+        }).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: 'messages', operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
-        }
+        });
+
+        // Fetch Students
+        const studentsQuery = query(collection(db, "students"), orderBy("name"));
+        getDocs(studentsQuery).then(studentsSnapshot => {
+            const studentsList = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+            setStudents(studentsList);
+        }).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: 'students', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+        });
     };
     
     useEffect(() => {
@@ -214,3 +217,5 @@ export default function AdminPage() {
         </main>
     );
 }
+
+    
