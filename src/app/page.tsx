@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -639,46 +640,52 @@ function ProjectsSection() {
 
   const onSave = async (data: any, projectId?: string) => {
     try {
-      let imageUrl = data.image || "https://placehold.co/600x400.png";
       const isEditing = !!projectId;
-
+      let imageUrl = data.image || "https://placehold.co/600x400.png";
+      let projectDocRef;
+  
+      if (isEditing) {
+        projectDocRef = doc(db, "projects", projectId!);
+      } else {
+        projectDocRef = doc(collection(db, "projects"));
+      }
+  
       // If there's a new image file, upload it
       if (data.image && data.image.startsWith('data:image')) {
-        const storageRef = ref(storage, `projects/${projectId || doc(collection(db, "projects")).id}`);
+        const storageRef = ref(storage, `projects/${projectDocRef.id}`);
         await uploadString(storageRef, data.image, 'data_url');
         imageUrl = await getDownloadURL(storageRef);
       } else if (isEditing) {
         const existingProject = projects.find(p => p.id === projectId);
         imageUrl = existingProject?.image || imageUrl;
       }
-
+  
       const finalProjectData = { ...data, image: imageUrl };
-      
+  
       if (isEditing) {
-        const projectDocRef = doc(db, "projects", projectId!);
         await updateDoc(projectDocRef, finalProjectData).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'update', requestResourceData: finalProjectData });
-            errorEmitter.emit('permission-error', permissionError);
-            throw permissionError;
+          const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'update', requestResourceData: finalProjectData });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
         });
         toast({ title: "Project Updated!", description: "Your project has been successfully updated." });
       } else {
-        const projectDocRef = await addDoc(collection(db, "projects"), finalProjectData).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: 'projects', operation: 'create', requestResourceData: finalProjectData });
-            errorEmitter.emit('permission-error', permissionError);
-            throw permissionError;
+        await setDoc(projectDocRef, finalProjectData).catch(serverError => {
+          const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'create', requestResourceData: finalProjectData });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
         });
-
+  
         const notificationData = {
-            message: `New project added: "${data.title}" by ${data.author}`,
-            type: 'new_project',
-            link: `/projects#${projectDocRef.id}`,
-            createdAt: serverTimestamp(),
-            read: false,
+          message: `New project added: "${data.title}" by ${data.author}`,
+          type: 'new_project',
+          link: `/projects#${projectDocRef.id}`,
+          createdAt: serverTimestamp(),
+          read: false,
         };
         addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
-            errorEmitter.emit('permission-error', permissionError);
+          const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+          errorEmitter.emit('permission-error', permissionError);
         });
         toast({ title: "Project Added!", description: "Your project has been added to the hub." });
       }
