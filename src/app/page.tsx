@@ -66,6 +66,8 @@ type GroupedResources = {
   [category: string]: Resource[];
 };
 
+const ADMIN_EMAIL = "tingiya730@gmail.com";
+
 
 // Main Home Page Component
 export default function Home() {
@@ -530,19 +532,19 @@ type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
 const projectCategories = ["All", "AI", "Web Dev", "Mobile", "Data Science", "Cybersecurity"];
 
-function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => void, onOpenChange: (open: boolean) => void, author: string }) {
+function ProjectForm({ project, onSave, onOpenChange, author }: { project: Project | null, onSave: (data: any, projectId?: string) => void, onOpenChange: (open: boolean) => void, author: string }) {
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectFormSchema),
     defaultValues: {
-      title: "",
-      category: "",
-      description: "",
-      link: "",
+      title: project?.title || "",
+      category: project?.category || "",
+      description: project?.description || "",
+      link: project?.link || "",
       image: null,
-      tags: "",
+      tags: project?.tags?.join(', ') || "",
     },
   });
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(project?.image || null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -563,12 +565,13 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
       category: values.category,
       description: values.description,
       link: values.link,
-      image: values.image,
       tags: values.tags.split(",").map(t => t.trim()),
       hint: 'abstract',
-      author: author,
+      author: project?.author || author,
+      image: values.image, // Pass the new image data or null
     };
-    onSave(projectData);
+
+    onSave(projectData, project?.id);
     onOpenChange(false);
   };
 
@@ -598,7 +601,7 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
         <FormField control={form.control} name="tags" render={({ field }) => (
           <FormItem><FormLabel>Tags (comma-separated)</FormLabel><FormControl><Input placeholder="Python, NLTK, Flask" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
-        <Button type="submit" className="w-full">Add Project</Button>
+        <Button type="submit" className="w-full">{project ? 'Save Changes' : 'Add Project'}</Button>
       </form>
     </Form>
   );
@@ -606,6 +609,7 @@ function ProjectForm({ onSave, onOpenChange, author }: { onSave: (data: any) => 
 
 function ProjectsSection() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
@@ -633,20 +637,34 @@ function ProjectsSection() {
     }
   }, []);
 
-  const onSave = async (data: any) => {
-    let imageUrl = "https://placehold.co/600x400.png";
-    const projectDocRef = doc(collection(db, "projects"));
-
+  const onSave = async (data: any, projectId?: string) => {
     try {
-        if (data.image && data.image.startsWith('data:image')) {
-            const storageRef = ref(storage, `projects/${projectDocRef.id}`);
-            await uploadString(storageRef, data.image, 'data_url');
-            imageUrl = await getDownloadURL(storageRef);
-        }
-        
-        const finalProjectData = { ...data, image: imageUrl, id: projectDocRef.id };
-        
-        setDoc(projectDocRef, finalProjectData).catch(serverError => {
+      let imageUrl = data.image || "https://placehold.co/600x400.png";
+      const isEditing = !!projectId;
+
+      // If there's a new image file, upload it
+      if (data.image && data.image.startsWith('data:image')) {
+        const storageRef = ref(storage, `projects/${projectId || doc(collection(db, "projects")).id}`);
+        await uploadString(storageRef, data.image, 'data_url');
+        imageUrl = await getDownloadURL(storageRef);
+      } else if (isEditing) {
+        const existingProject = projects.find(p => p.id === projectId);
+        imageUrl = existingProject?.image || imageUrl;
+      }
+
+      const finalProjectData = { ...data, image: imageUrl };
+      
+      if (isEditing) {
+        const projectDocRef = doc(db, "projects", projectId!);
+        await updateDoc(projectDocRef, finalProjectData).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'update', requestResourceData: finalProjectData });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        });
+        toast({ title: "Project Updated!", description: "Your project has been successfully updated." });
+      } else {
+        const projectDocRef = doc(collection(db, "projects"));
+        await setDoc(projectDocRef, { ...finalProjectData, id: projectDocRef.id }).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: projectDocRef.path, operation: 'create', requestResourceData: finalProjectData });
             errorEmitter.emit('permission-error', permissionError);
             throw permissionError;
@@ -663,10 +681,11 @@ function ProjectsSection() {
             const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
             errorEmitter.emit('permission-error', permissionError);
         });
-
         toast({ title: "Project Added!", description: "Your project has been added to the hub." });
-        fetchProjects();
-        setIsDialogOpen(false);
+      }
+      
+      fetchProjects();
+      handleCloseDialog();
     } catch (error) {
         if (!(error instanceof FirestorePermissionError)) {
             toast({ variant: "destructive", title: "Save failed", description: "There was an issue saving your project."});
@@ -674,10 +693,40 @@ function ProjectsSection() {
     }
   };
   
-  const handleAddClick = () => {
-      setIsDialogOpen(true);
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+        const projectRef = doc(db, "projects", projectId);
+        await deleteDoc(projectRef).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: projectRef.path, operation: 'delete' });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        });
+        toast({ title: "Project Deleted", description: "The project has been removed." });
+        fetchProjects();
+    } catch(error) {
+        if (!(error instanceof FirestorePermissionError)) {
+            toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the project." });
+        }
+    }
   };
 
+  const handleAddClick = () => {
+    setEditingProject(null);
+    setIsDialogOpen(true);
+  };
+  
+  const handleEditClick = (project: Project) => {
+    setEditingProject(project);
+    setIsDialogOpen(true);
+  };
+  
+  const handleCloseDialog = () => {
+    setEditingProject(null);
+    setIsDialogOpen(false);
+  };
+
+  const isAdmin = currentUser?.email === ADMIN_EMAIL;
+  
   return (
       <div className="container mx-auto p-6 lg:p-8">
         <PageHeader
@@ -685,7 +734,7 @@ function ProjectsSection() {
           description="Discover innovative projects by students."
         />
         <div className="flex justify-end my-6">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
               <DialogTrigger asChild>
                  <Button onClick={handleAddClick} disabled={!currentUser}>
                     <PlusCircle className="mr-2"/> Add Project
@@ -693,12 +742,13 @@ function ProjectsSection() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add Your Project</DialogTitle>
+                  <DialogTitle>{editingProject ? 'Edit Project' : 'Add Your Project'}</DialogTitle>
                 </DialogHeader>
                 {currentUser ? (
                     <ProjectForm 
+                        project={editingProject}
                         onSave={onSave} 
-                        onOpenChange={setIsDialogOpen} 
+                        onOpenChange={handleCloseDialog} 
                         author={currentUser.name} 
                     />
                 ) : (
@@ -732,6 +782,32 @@ function ProjectsSection() {
                           className="object-cover w-full h-full" 
                           data-ai-hint={project.hint} 
                         />
+                         {(isAdmin || currentUser?.name === project.author) && (
+                            <div className="absolute top-2 right-2 flex gap-2">
+                                <Button size="icon" variant="secondary" onClick={() => handleEditClick(project)}>
+                                    <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button size="icon" variant="destructive">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will permanently delete the project. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteProject(project.id)}>Continue</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                        )}
                       </div>
                       <CardHeader>
                         <CardTitle className="font-headline">{project.title}</CardTitle>
@@ -777,42 +853,20 @@ const eventConfig: { [key: string]: { icon: React.ReactNode; variant: BadgeProps
   announcement: { icon: <Milestone className="h-4 w-4" />, variant: 'secondary' },
 };
 
-const ADMIN_EMAIL_EVENTS = "tingiya730@gmail.com";
-
-function EventForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange: (open: boolean) => void }) {
+function EventForm({ event, onSave, onOpenChange }: { event: Event | null, onSave: (values: EventFormValues, eventId?: string) => void, onOpenChange: (open: boolean) => void }) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
-    defaultValues: { title: "", description: "", date: "", type: "event" },
+    defaultValues: { 
+        title: event?.title || "", 
+        description: event?.description || "", 
+        date: event?.date || "", 
+        type: event?.type || "event" 
+    },
   });
 
   const handleSubmit = async (values: EventFormValues) => {
-    try {
-      const eventDocRef = await addDoc(collection(db, "events"), values).catch(serverError => {
-          const permissionError = new FirestorePermissionError({ path: 'events', operation: 'create', requestResourceData: values });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-      });
-
-      const notificationData = {
-        message: `New ${values.type}: ${values.title}`,
-        type: 'new_event',
-        link: `/events#${eventDocRef.id}`,
-        createdAt: serverTimestamp(),
-        read: false,
-      };
-      addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
-          const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
-          errorEmitter.emit('permission-error', permissionError);
-      });
-
-      onSave();
-      onOpenChange(false);
-      form.reset();
-    } catch (error) {
-       if (!(error instanceof FirestorePermissionError)) {
-          console.error("Error saving event: ", error);
-       }
-    }
+    onSave(values, event?.id);
+    onOpenChange(false);
   };
 
   return (
@@ -840,7 +894,7 @@ function EventForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange:
         <FormField control={form.control} name="description" render={({ field }) => (
           <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Showcase your hard work..." {...field} /></FormControl><FormMessage /></FormItem>
         )} />
-        <Button type="submit" className="w-full">Add Event</Button>
+        <Button type="submit" className="w-full">{event ? 'Save Changes' : 'Add Event'}</Button>
       </form>
     </Form>
   );
@@ -848,6 +902,7 @@ function EventForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange:
 
 function EventsSection() {
   const [events, setEvents] = useState<Event[]>([]);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
@@ -876,13 +931,79 @@ function EventsSection() {
     }
   }, []);
 
-  const onSave = () => {
-    fetchEvents();
-    setIsDialogOpen(false);
-    toast({ title: "Event Added!", description: "The new event has been added." });
+  const onSave = async (values: EventFormValues, eventId?: string) => {
+    const isEditing = !!eventId;
+    try {
+        if (isEditing) {
+            const eventDocRef = doc(db, "events", eventId!);
+            await updateDoc(eventDocRef, values).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: eventDocRef.path, operation: 'update', requestResourceData: values });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError;
+            });
+            toast({ title: "Event Updated", description: "The event has been successfully updated." });
+        } else {
+            const eventDocRef = await addDoc(collection(db, "events"), values).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: 'events', operation: 'create', requestResourceData: values });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError;
+            });
+            const notificationData = {
+                message: `New ${values.type}: ${values.title}`,
+                type: 'new_event',
+                link: `/events#${eventDocRef.id}`,
+                createdAt: serverTimestamp(),
+                read: false,
+            };
+            addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+            toast({ title: "Event Added!", description: "The new event has been added." });
+        }
+        fetchEvents();
+        handleCloseDialog();
+    } catch (error) {
+       if (!(error instanceof FirestorePermissionError)) {
+          console.error("Error saving event: ", error);
+          toast({ variant: 'destructive', title: 'Save Failed', description: 'There was an issue saving the event.'});
+       }
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+        const eventRef = doc(db, "events", eventId);
+        await deleteDoc(eventRef).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: eventRef.path, operation: 'delete' });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError;
+        });
+        toast({ title: "Event Deleted", description: "The event has been removed." });
+        fetchEvents();
+    } catch(error) {
+        if (!(error instanceof FirestorePermissionError)) {
+            toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the event." });
+        }
+    }
+  };
+
+  const handleAddClick = () => {
+    setEditingEvent(null);
+    setIsDialogOpen(true);
   };
   
-  const isAdmin = currentUser?.email === ADMIN_EMAIL_EVENTS;
+  const handleEditClick = (event: Event) => {
+    setEditingEvent(event);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setEditingEvent(null);
+    setIsDialogOpen(false);
+  };
+  
+  const isAdmin = currentUser?.email === ADMIN_EMAIL;
 
   return (
       <div className="container mx-auto p-6 lg:p-8">
@@ -892,15 +1013,15 @@ function EventsSection() {
         />
         {isAdmin && (
           <div className="flex justify-end my-6">
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
                 <DialogTrigger asChild>
-                  <Button><PlusCircle className="mr-2"/> Add Event</Button>
+                  <Button onClick={handleAddClick}><PlusCircle className="mr-2"/> Add Event</Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add a New Event</DialogTitle>
+                    <DialogTitle>{editingEvent ? 'Edit Event' : 'Add a New Event'}</DialogTitle>
                   </DialogHeader>
-                  <EventForm onSave={onSave} onOpenChange={setIsDialogOpen} />
+                  <EventForm event={editingEvent} onSave={onSave} onOpenChange={handleCloseDialog} />
                 </DialogContent>
               </Dialog>
           </div>
@@ -929,6 +1050,32 @@ function EventsSection() {
                   {new Date(event.date).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}
                 </p>
                 <p className="text-foreground">{event.description}</p>
+                {isAdmin && (
+                    <div className="mt-2 flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleEditClick(event)}>
+                            <Edit className="h-4 w-4 mr-2" /> Edit
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive">
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Event?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will permanently delete the event. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteEvent(event.id)}>Continue</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                )}
               </div>
             </div>
           ))}
@@ -954,8 +1101,6 @@ const resourceCategories = [
   "Project Ideas",
   "Upcoming Tech Challenges",
 ];
-
-const ADMIN_EMAIL_RESOURCES = "tingiya730@gmail.com";
 
 function ResourceForm({ onSave, onOpenChange }: { onSave: () => void, onOpenChange: (open: boolean) => void }) {
   const form = useForm<ResourceFormValues>({
@@ -1077,7 +1222,7 @@ function ResourcesSection() {
     toast({ title: "Resource Added!", description: "The new resource has been added." });
   };
   
-  const isAdmin = currentUser?.email === ADMIN_EMAIL_RESOURCES;
+  const isAdmin = currentUser?.email === ADMIN_EMAIL;
   
   return (
       <div className="container mx-auto p-6 lg:p-8">
@@ -1149,8 +1294,6 @@ const contactFormSchema = z.object({
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
 
-const ADMIN_EMAIL_CONTACT = "tingiya730@gmail.com";
-
 function ContactSection() {
   const { toast } = useToast();
   const [admin, setAdmin] = useState<Student | null>(null);
@@ -1159,7 +1302,7 @@ function ContactSection() {
   useEffect(() => {
     const fetchAdmin = async () => {
       try {
-        const q = query(collection(db, "students"), where("email", "==", ADMIN_EMAIL_CONTACT));
+        const q = query(collection(db, "students"), where("email", "==", ADMIN_EMAIL));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           const adminDoc = querySnapshot.docs[0];
@@ -1312,3 +1455,4 @@ function ContactSection() {
       </div>
   );
 }
+
