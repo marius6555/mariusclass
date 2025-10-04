@@ -18,10 +18,9 @@ export async function chat(history: ChatHistory) {
     `;
 
   const result = await ai.generate({
-    model: 'googleai/gemini-pro',
+    model: 'googleai/gemini-1.5-flash-latest',
     prompt,
   });
 
   return result.text;
 }
-
