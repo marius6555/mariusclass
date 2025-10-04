@@ -143,14 +143,15 @@ export function Notifications() {
             {notifications.length > 0 ? (
                 notifications.map((n) => (
                     <div key={n.id} className={`p-4 border-b last:border-b-0 ${!n.read ? 'bg-accent/50' : ''}`}>
-                        <Link href={n.link || '#'} passHref>
-                            <a className="block hover:bg-muted/50 -m-4 p-4" onClick={() => handleMarkAsRead(n.id)}>
-                                <p className="text-sm mb-1">{n.message}</p>
-
-                                <p className="text-xs text-muted-foreground">
-                                    {n.createdAt ? formatDistanceToNow(n.createdAt.toDate(), { addSuffix: true }) : 'just now'}
-                                </p>
-                            </a>
+                        <Link
+                            href={n.link || '#'}
+                            className="block hover:bg-muted/50 -m-4 p-4"
+                            onClick={() => handleMarkAsRead(n.id)}
+                        >
+                            <p className="text-sm mb-1">{n.message}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {n.createdAt ? formatDistanceToNow(n.createdAt.toDate(), { addSuffix: true }) : 'just now'}
+                            </p>
                         </Link>
                     </div>
                 ))
