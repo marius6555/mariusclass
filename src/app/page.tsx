@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
+import { Chatbot } from '@/components/chatbot';
 
 
 // Common types
@@ -104,6 +105,7 @@ export default function Home() {
         <div id="contact" className="py-16 lg:py-24 bg-background">
           <ContactSection />
         </div>
+        <Chatbot />
     </main>
   );
 }
@@ -1449,6 +1451,7 @@ function ContactSection() {
                 <CardHeader className="flex flex-row items-center gap-4">
                   <Avatar className="w-16 h-16">
                     <AvatarFallback>{admin.initials}</AvatarFallback>
+
                   </Avatar>
                   <div>
                     <CardTitle className="font-headline">{admin.name}</CardTitle>
@@ -1533,6 +1536,3 @@ function ContactSection() {
       </div>
   );
 }
-
-
-    
