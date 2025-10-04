@@ -31,7 +31,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
-import { Chatbot } from '@/components/chatbot';
 
 
 // Common types
@@ -105,7 +104,6 @@ export default function Home() {
         <div id="contact" className="py-16 lg:py-24 bg-background">
           <ContactSection />
         </div>
-        <Chatbot />
     </main>
   );
 }
