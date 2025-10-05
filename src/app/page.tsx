@@ -69,20 +69,40 @@ type GroupedResources = {
 
 const ADMIN_EMAIL = "tingiya730@gmail.com";
 
+const backgroundImages = [
+    'https://picsum.photos/seed/tech1/1920/1080',
+    'https://picsum.photos/seed/books2/1920/1080',
+    'https://picsum.photos/seed/code3/1920/1080',
+    'https://picsum.photos/seed/nature4/1920/1080',
+];
 
 // Main Home Page Component
 export default function Home() {
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % backgroundImages.length);
+        }, 10000); // Change image every 10 seconds
+
+        return () => clearTimeout(timer);
+    }, [currentImageIndex]);
 
   return (
     <main>
-        <div id="home" className="flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px] bg-background">
-            <div className="relative z-10">
+        <div 
+            id="home" 
+            className="relative flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px] bg-cover bg-center transition-all duration-1000 ease-in-out"
+            style={{ backgroundImage: `url(${backgroundImages[currentImageIndex]})` }}
+        >
+            <div className="absolute inset-0 bg-black/50 z-0" />
+            <div className="relative z-10 text-white">
               <h1 className="font-headline text-4xl md:text-6xl font-bold tracking-tight">Welcome to</h1>
-              <div className="bg-primary p-4 rounded-lg my-6 inline-block">
+              <div className="bg-primary/80 p-4 rounded-lg my-6 inline-block backdrop-blur-sm">
                 <GraduationCap className="text-primary-foreground h-16 w-16" />
               </div>
               <h2 className="font-headline text-3xl md:text-5xl font-bold tracking-tight">ClassHub Central</h2>
-              <p className="mt-4 text-lg md:text-xl text-muted-foreground max-w-2xl">Your central hub for class activities, resources, and collaboration.</p>
+              <p className="mt-4 text-lg md:text-xl text-gray-200 max-w-2xl">Your central hub for class activities, resources, and collaboration.</p>
             </div>
         </div>
         
@@ -1554,3 +1574,6 @@ function ContactSection() {
   );
 }
 
+
+
+    
