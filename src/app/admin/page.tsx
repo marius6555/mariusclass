@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 
 type Message = {
@@ -37,6 +38,7 @@ export default function AdminPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
+    const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
 
     const fetchAdminData = async () => {
         // Fetch Messages
@@ -117,6 +119,23 @@ export default function AdminPage() {
                 title="Admin Dashboard"
                 description="View messages and manage student profiles."
             />
+
+            <Dialog open={!!viewingMessage} onOpenChange={(isOpen) => !isOpen && setViewingMessage(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Message from {viewingMessage?.name}</DialogTitle>
+                        <DialogDescription>
+                            Contact: {viewingMessage?.email}
+                            {viewingMessage?.whatsapp && ` / ${viewingMessage.whatsapp}`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 whitespace-pre-wrap">
+                        {viewingMessage?.message}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+
             <div className="space-y-8 mt-8">
                 <Card>
                     <CardHeader>
@@ -143,7 +162,12 @@ export default function AdminPage() {
                                             <div>{msg.email}</div>
                                             {msg.whatsapp && <div className="text-xs text-muted-foreground">{msg.whatsapp}</div>}
                                         </TableCell>
-                                        <TableCell className="max-w-xs truncate">{msg.message}</TableCell>
+                                        <TableCell 
+                                            className="max-w-xs truncate cursor-pointer hover:text-primary"
+                                            onClick={() => setViewingMessage(msg)}
+                                        >
+                                            {msg.message}
+                                        </TableCell>
                                         <TableCell>{msg.createdAt.toDate().toLocaleDateString()}</TableCell>
                                         <TableCell>
                                             <Badge 
