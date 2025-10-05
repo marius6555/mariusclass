@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Briefcase } from "lucide-react";
+import { Mail, Briefcase, ArrowLeft } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, addDoc, where } from "firebase/firestore";
 import { PageHeader } from '@/components/page-header';
@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
+import { useRouter } from 'next/navigation';
 
 const ADMIN_EMAIL = "tingiya730@gmail.com";
 
@@ -37,6 +38,7 @@ export default function ContactPage() {
   const { toast } = useToast();
   const [admin, setAdmin] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchAdmin = async () => {
@@ -109,6 +111,10 @@ export default function ContactPage() {
 
   return (
       <main className="container mx-auto p-6 lg:p-8 pt-24">
+        <Button variant="outline" onClick={() => router.push('/')} className="mb-8">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Home
+        </Button>
         <PageHeader
           title="Contact Us"
           description="Get in touch with the administrator."

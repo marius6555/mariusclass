@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Bell, Calendar, Milestone, Trash2, Edit } from "lucide-react";
+import { PlusCircle, Bell, Calendar, Milestone, Trash2, Edit, ArrowLeft } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, collection, getDocs, query, orderBy, updateDoc, setDoc, addDoc, deleteDoc } from "firebase/firestore";
 import { PageHeader } from '@/components/page-header';
@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
+import { useRouter } from 'next/navigation';
 
 type Event = {
   id: string;
@@ -101,6 +102,7 @@ export default function EventsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   const fetchEvents = async () => {
     try {
@@ -203,6 +205,10 @@ export default function EventsPage() {
 
   return (
       <main className="container mx-auto p-6 lg:p-8 pt-24">
+        <Button variant="outline" onClick={() => router.push('/')} className="mb-8">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Home
+        </Button>
         <PageHeader
           title="Events & Updates"
           description="Stay informed about important dates, announcements, and deadlines."

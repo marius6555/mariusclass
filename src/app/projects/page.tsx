@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, PlusCircle, Trash2, Edit } from "lucide-react";
+import { ExternalLink, PlusCircle, Trash2, Edit, ArrowLeft } from "lucide-react";
 import { db, storage } from "@/lib/firebase";
 import { doc, collection, getDocs, query, updateDoc, setDoc, addDoc, deleteDoc } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
+import { useRouter } from 'next/navigation';
 
 // Common types
 export type Project = {
@@ -136,6 +137,7 @@ export default function ProjectsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Student | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   const fetchProjects = async () => {
     try {
@@ -256,6 +258,10 @@ export default function ProjectsPage() {
   
   return (
       <main className="container mx-auto p-6 lg:p-8 pt-24">
+        <Button variant="outline" onClick={() => router.push('/')} className="mb-8">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Home
+        </Button>
         <PageHeader
           title="Project Hub"
           description="Discover innovative projects by students."
