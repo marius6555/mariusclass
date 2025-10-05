@@ -121,7 +121,7 @@ const studentFormSchema = z.object({
   linkedin: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
   instagram: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
   facebook: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
-  whatsapp: z.string().min(10, "Please enter a valid WhatsApp number.").optional().or(z.literal('')),
+  whatsapp: z.string().regex(/^\+\d+$/, "Number must start with a country code (e.g., +1234567890).").optional().or(z.literal('')),
 });
 
 type StudentFormValues = z.infer<typeof studentFormSchema>;
@@ -185,7 +185,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
           <FormItem><FormLabel className="flex items-center gap-2"><Instagram className="w-4 h-4"/> Instagram</FormLabel><FormControl><Input placeholder="https://instagram.com/your-username" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="facebook" render={({ field }) => (
-          <FormItem><FormLabel className="flex items-center gap-2"><Facebook className="w-4 h-4"/> Facebook</FormLabel><FormControl><Input placeholder="https://facebook.com/your-profile" {...field} /></FormControl></FormItem>
+          <FormItem><FormLabel className="flex items-center gap-2"><Facebook className="w-4 h-4"/> Facebook</FormLabel><FormControl><Input placeholder="https://facebook.com/your-profile" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="whatsapp" render={({ field }) => (
           <FormItem>
@@ -195,7 +195,7 @@ function StudentForm({ student, onSave, onOpenChange }: { student: Student | nul
                 </svg>
                 WhatsApp
             </FormLabel>
-            <FormControl><Input placeholder="Your WhatsApp number" {...field} /></FormControl>
+            <FormControl><Input placeholder="+1234567890" {...field} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -1372,7 +1372,7 @@ function ResourcesSection() {
 const contactFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
-  whatsapp: z.string().optional(),
+  whatsapp: z.string().regex(/^\+\d+$/, "Number must start with a country code (e.g., +1234567890).").optional().or(z.literal('')),
   message: z.string().min(10, { message: "Message must be at least 10 characters." }).max(500),
 });
 
