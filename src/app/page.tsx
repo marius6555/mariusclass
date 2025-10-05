@@ -46,10 +46,10 @@ const backgroundImage = 'https://picsum.photos/seed/students-coding/1920/1080';
 // Main Home Page Component
 export default function Home() {
   return (
-    <main>
+    <main className="container mx-auto p-6 lg:p-8 pt-24">
         <div 
             id="home" 
-            className="relative flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px] bg-cover bg-center"
+            className="relative flex flex-col justify-center items-center text-center p-8 rounded-3xl bg-cover bg-center overflow-hidden h-[60vh] md:h-[70vh]"
             style={{ backgroundImage: `url(${backgroundImage})` }}
             data-ai-hint="african students coding"
         >
@@ -323,7 +323,7 @@ function StudentsSection() {
   const userHasProfile = useMemo(() => students.some(s => s.uid === currentUser?.uid), [students, currentUser]);
 
   return (
-      <div className="container mx-auto p-6 lg:p-8">
+      <div className="container mx-auto">
         <PageHeader
           title="Student Profiles"
           description="Get to know your classmates."
