@@ -69,31 +69,17 @@ type GroupedResources = {
 
 const ADMIN_EMAIL = "tingiya730@gmail.com";
 
-const backgroundImages = [
-    'https://picsum.photos/seed/tech1/1920/1080',
-    'https://picsum.photos/seed/books2/1920/1080',
-    'https://picsum.photos/seed/code3/1920/1080',
-    'https://picsum.photos/seed/nature4/1920/1080',
-];
+const backgroundImage = 'https://picsum.photos/seed/students-coding/1920/1080';
 
 // Main Home Page Component
 export default function Home() {
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % backgroundImages.length);
-        }, 10000); // Change image every 10 seconds
-
-        return () => clearTimeout(timer);
-    }, [currentImageIndex]);
-
   return (
     <main>
         <div 
             id="home" 
-            className="relative flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px] bg-cover bg-center transition-all duration-1000 ease-in-out"
-            style={{ backgroundImage: `url(${backgroundImages[currentImageIndex]})` }}
+            className="relative flex flex-col justify-center items-center text-center p-8 h-screen pt-[60px] bg-cover bg-center"
+            style={{ backgroundImage: `url(${backgroundImage})` }}
+            data-ai-hint="african students coding"
         >
             <div className="absolute inset-0 bg-black/50 z-0" />
             <div className="relative z-10 text-white">
