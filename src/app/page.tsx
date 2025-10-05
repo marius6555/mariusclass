@@ -1414,7 +1414,7 @@ function ContactSection() {
 
   async function onSubmit(values: ContactFormValues) {
     try {
-      await addDoc(collection(db, "messages"), {
+      const messageDocRef = await addDoc(collection(db, "messages"), {
         ...values,
         createdAt: serverTimestamp(),
         read: false,
@@ -1423,6 +1423,19 @@ function ContactSection() {
         errorEmitter.emit('permission-error', permissionError);
         throw permissionError;
       });
+
+      const notificationData = {
+          message: `New message from ${values.name}`,
+          type: 'new_message',
+          link: '/admin',
+          createdAt: serverTimestamp(),
+          read: false,
+      };
+      addDoc(collection(db, "notifications"), notificationData).catch(serverError => {
+          const permissionError = new FirestorePermissionError({ path: 'notifications', operation: 'create', requestResourceData: notificationData });
+          errorEmitter.emit('permission-error', permissionError);
+      });
+
       toast({
         title: "Message Sent!",
         description: "Thanks for reaching out. We'll get back to you soon.",
@@ -1540,3 +1553,4 @@ function ContactSection() {
       </div>
   );
 }
+
