@@ -14,19 +14,22 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Notifications } from './notifications';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 
-const baseLinks = [
+const homePageLinks = [
   { to: "home", label: "Home", icon: Home },
   { to: "students", label: "Student Profiles", icon: Users },
-  { to: "projects", label: "Project Hub", icon: FolderKanban },
-  { to: "events", label: "Events/Updates", icon: CalendarClock },
-  { to: "resources", label: "Resources", icon: BookCopy },
-  { to: "contact", label: "Contact", icon: Mail },
 ];
 
-const authLink = { href: "/auth", label: "Login/Sign Up", icon: LogIn, isExternal: true };
-const adminLink = { href: "/admin", label: "Admin", icon: Shield, isExternal: true };
+const otherPageLinks = [
+  { href: "/projects", label: "Project Hub", icon: FolderKanban },
+  { href: "/events", label: "Events/Updates", icon: CalendarClock },
+  { href: "/resources", label: "Resources", icon: BookCopy },
+  { href: "/contact", label: "Contact", icon: Mail },
+];
+
+const authLink = { href: "/auth", label: "Login/Sign Up", icon: LogIn };
+const adminLink = { href: "/admin", label: "Admin", icon: Shield };
 
 const ADMIN_EMAIL = "tingiya730@gmail.com";
 
@@ -66,67 +69,71 @@ export function AppHeader() {
 
   const isAdmin = currentUser?.email === ADMIN_EMAIL;
   
-  const getNavLinks = () => {
-    let links: (typeof baseLinks[0] | typeof adminLink | { onClick: () => void, label: string, icon: any })[] = [...baseLinks];
-    
-    if (currentUser) {
-      if (isAdmin) {
-        const contactIndex = links.findIndex(link => 'to' in link && link.to === 'contact');
-        if (contactIndex !== -1) {
-            links.splice(contactIndex + 1, 0, adminLink);
-        } else {
-            links.push(adminLink);
-        }
-      }
-      links.push({ onClick: handleLogout, label: 'Logout', icon: LogOut });
-    } else {
-      links.splice(1, 0, authLink);
-    }
-    
-    return links;
-  };
-  
-  const navLinks = getNavLinks();
-
   const handleLinkClick = () => {
     setIsSheetOpen(false);
   };
   
-  const NavLink = ({ link }: { link: any }) => {
-    if (link.isExternal) {
-      return (
-        <Link href={link.href!} passHref>
-          <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLinkClick}>
-            <link.icon className="h-4 w-4" />
-            {link.label}
-          </Button>
-        </Link>
-      );
+  const NavLinks = () => {
+    const isHomePage = pathname === '/';
+    
+    const allLinks = [
+      ...(isHomePage ? homePageLinks.map(l => ({ ...l, type: 'scroll' })) : [{ href: '/', label: 'Home', icon: Home, type: 'link' }]),
+      ...(isHomePage ? [] : [{ href: '/#students', label: 'Student Profiles', icon: Users, type: 'link'}]),
+      ...otherPageLinks.map(l => ({ ...l, type: 'link' })),
+    ];
+    
+    let finalLinks: any[] = [];
+    if (currentUser) {
+      if (isAdmin) {
+        finalLinks = [...allLinks, adminLink, { onClick: handleLogout, label: 'Logout', icon: LogOut, type: 'button' }];
+      } else {
+        finalLinks = [...allLinks, { onClick: handleLogout, label: 'Logout', icon: LogOut, type: 'button' }];
+      }
+    } else {
+      const homeIndex = allLinks.findIndex(l => (l.to === 'home' || l.href === '/'));
+      allLinks.splice(homeIndex + 1, 0, authLink as any);
+      finalLinks = allLinks;
     }
     
-    if (link.onClick) {
-        return (
-            <Button variant="ghost" className="w-full justify-start gap-2" onClick={link.onClick}>
-              <link.icon className="h-4 w-4" />
-              {link.label}
-            </Button>
-        )
-    }
-
     return (
-      <ScrollLink
-        to={link.to!}
-        smooth={true}
-        duration={500}
-        spy={true}
-        offset={-60}
-        onClick={handleLinkClick}
-        className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer"
-        activeClass="bg-accent"
-      >
-        <link.icon className="h-4 w-4" />
-        {link.label}
-      </ScrollLink>
+      <>
+        {finalLinks.map((link) => {
+          if (link.type === 'scroll') {
+            return (
+              <ScrollLink
+                key={link.to}
+                to={link.to!}
+                smooth={true}
+                duration={500}
+                spy={true}
+                offset={-60}
+                onClick={handleLinkClick}
+                className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer"
+                activeClass="bg-accent"
+              >
+                <link.icon className="h-4 w-4" />
+                {link.label}
+              </ScrollLink>
+            );
+          }
+          if (link.type === 'button') {
+            return (
+              <Button key={link.label} variant="ghost" className="w-full justify-start gap-2" onClick={() => { link.onClick(); handleLinkClick(); }}>
+                <link.icon className="h-4 w-4" />
+                {link.label}
+              </Button>
+            );
+          }
+          return (
+            <Link href={link.href!} key={link.href} passHref>
+              <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLinkClick}>
+                <link.icon className="h-4 w-4" />
+                {link.label}
+              </Button>
+            </Link>
+          );
+        })}
+      </>
     );
   };
 
@@ -163,9 +170,7 @@ export function AppHeader() {
                 </SheetHeader>
                 <div className="p-4">
                 <nav className="flex flex-col gap-2">
-                    {navLinks.map((link) => (
-                    <NavLink key={link.to || link.href || link.label} link={link} />
-                    ))}
+                    <NavLinks />
                 </nav>
                 </div>
             </SheetContent>
